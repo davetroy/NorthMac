@@ -12,27 +12,26 @@ struct DiskEntry: Identifiable, Hashable {
 }
 
 struct ContentView: View {
-    @ObservedObject var emulator: EmulatorCore
+    @StateObject private var emulator = EmulatorCore()
     @State private var availableDisks: [DiskEntry] = []
     @State private var availableHDs: [DiskEntry] = []
     @State private var selectedDisk1: DiskEntry?
     @State private var selectedDisk2: DiskEntry?
     @State private var selectedHD: DiskEntry?
-    @AppStorage("lastDisk1") private var lastDisk1Name = ""
-    @AppStorage("lastDisk2") private var lastDisk2Name = ""
-    @AppStorage("lastHD") private var lastHDName = ""
+    @State private var showDiskControls = false
     @State private var showCRTControls = false
     @State private var diskWarning: String?
     @State private var showDiskWarning = false
     @State private var setupWarning: String?
     @State private var showSetupWarning = false
-    @AppStorage("vintageFX") private var vintageFX = true
-    @AppStorage("phosphorColor") private var phosphorColorRaw = "Green"
-    @AppStorage("bloomIntensity") private var bloomIntensity: Double = 0.6
-    @AppStorage("scanlineIntensity") private var scanlineIntensity: Double = 0.5
-    @AppStorage("curvatureIntensity") private var curvatureIntensity: Double = 0.4
-    @AppStorage("screenGlowIntensity") private var screenGlowIntensity: Double = 0.5
-    @AppStorage("turboMode") private var turboModeSaved = false
+    // Per-window display settings, initialized from saved defaults
+    @State private var vintageFX: Bool = UserDefaults.standard.object(forKey: "vintageFX") as? Bool ?? true
+    @State private var phosphorColorRaw: String = UserDefaults.standard.string(forKey: "phosphorColor") ?? "Green"
+    @State private var bloomIntensity: Double = UserDefaults.standard.object(forKey: "bloomIntensity") as? Double ?? 0.6
+    @State private var scanlineIntensity: Double = UserDefaults.standard.object(forKey: "scanlineIntensity") as? Double ?? 0.5
+    @State private var curvatureIntensity: Double = UserDefaults.standard.object(forKey: "curvatureIntensity") as? Double ?? 0.4
+    @State private var screenGlowIntensity: Double = UserDefaults.standard.object(forKey: "screenGlowIntensity") as? Double ?? 0.5
+    @Environment(\.controlActiveState) private var controlActiveState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,115 +58,7 @@ struct ContentView: View {
             }
             .background(Color.black)
 
-            // Bottom toolbar
-            HStack(spacing: 10) {
-                Button(emulator.isRunning ? "Pause" : "Resume") {
-                    if emulator.isRunning { emulator.stop() } else { emulator.start() }
-                }
-                .keyboardShortcut("p", modifiers: [.command])
-
-                Button("Reset") { emulator.reset() }
-                    .keyboardShortcut("r", modifiers: [.command, .shift])
-
-                Divider().frame(height: 16)
-
-                // Drive 1 disk picker
-                Picker("Drive 1", selection: $selectedDisk1) {
-                    Text("None").tag(nil as DiskEntry?)
-                    ForEach(diskCategories, id: \.0) { category, disks in
-                        Section(category) {
-                            ForEach(disks) { disk in
-                                Text(disk.name).tag(disk as DiskEntry?)
-                            }
-                        }
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 200)
-                .onChange(of: selectedDisk1) { _, disk in
-                    if let disk = disk {
-                        mountWithValidation(disk: disk, drive: 0)
-                        lastDisk1Name = disk.name
-                    }
-                }
-
-                // Drive 2 disk picker
-                Picker("Drive 2", selection: $selectedDisk2) {
-                    Text("None").tag(nil as DiskEntry?)
-                    ForEach(diskCategories, id: \.0) { category, disks in
-                        Section(category) {
-                            ForEach(disks) { disk in
-                                Text(disk.name).tag(disk as DiskEntry?)
-                            }
-                        }
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 200)
-                .onChange(of: selectedDisk2) { _, disk in
-                    if let disk = disk {
-                        mountWithValidation(disk: disk, drive: 1)
-                        lastDisk2Name = disk.name
-                    }
-                }
-
-                // Hard disk picker
-                Picker("HD", selection: $selectedHD) {
-                    Text("None").tag(nil as DiskEntry?)
-                    ForEach(availableHDs) { hd in
-                        Text(hd.name).tag(hd as DiskEntry?)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 140)
-                .onChange(of: selectedHD) { _, hd in
-                    if let hd = hd {
-                        emulator.mountHardDisk(url: hd.url)
-                        lastHDName = hd.name
-                    }
-                }
-
-                Divider().frame(height: 16)
-
-                Button("CRT") { showCRTControls.toggle() }
-                    .popover(isPresented: $showCRTControls) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Display").font(.headline)
-                            Picker("Phosphor", selection: $phosphorColorRaw) {
-                                ForEach(PhosphorColor.allCases, id: \.self) { color in
-                                    Text(color.rawValue).tag(color.rawValue)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            Divider()
-                            Toggle("Vintage FX", isOn: $vintageFX)
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
-                            HStack { Text("Bloom"); Spacer(); Slider(value: $bloomIntensity, in: 0...1).frame(width: 120) }
-                                .disabled(!vintageFX)
-                            HStack { Text("Scanlines"); Spacer(); Slider(value: $scanlineIntensity, in: 0...1).frame(width: 120) }
-                                .disabled(!vintageFX)
-                            HStack { Text("Curvature"); Spacer(); Slider(value: $curvatureIntensity, in: 0...1).frame(width: 120) }
-                                .disabled(!vintageFX)
-                            HStack { Text("Brightness"); Spacer(); Slider(value: $screenGlowIntensity, in: 0...1).frame(width: 120) }
-                                .disabled(!vintageFX)
-                        }
-                        .padding()
-                        .frame(width: 280)
-                    }
-
-                Toggle("Turbo", isOn: $emulator.turboMode)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .onChange(of: emulator.turboMode) { _, newVal in
-                        turboModeSaved = newVal
-                    }
-
-                Spacer()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.bar)
+            toolbarView
         }
         .frame(minWidth: 800, minHeight: 520)
         .alert("Disk Warning", isPresented: $showDiskWarning) {
@@ -204,35 +95,131 @@ struct ContentView: View {
             }
 
             // Restore last disk selections, or fall back to defaults
-            // Prefer Advantage disks for auto-selection
-            let disk1 = availableDisks.first(where: { $0.name == lastDisk1Name })
+            let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
+            let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
+            let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
+
+            let disk1 = availableDisks.first(where: { $0.name == lastDisk1 })
                 ?? availableDisks.first(where: { $0.name == "advf2_cpm120_wm" })
                 ?? availableDisks.first(where: { $0.validation.isValid })
             if let disk1 = disk1 {
                 selectedDisk1 = disk1
                 mountWithValidation(disk: disk1, drive: 0)
             }
-            if !lastDisk2Name.isEmpty, let disk2 = availableDisks.first(where: { $0.name == lastDisk2Name }) {
+            if !lastDisk2.isEmpty, let disk2 = availableDisks.first(where: { $0.name == lastDisk2 }) {
                 selectedDisk2 = disk2
                 mountWithValidation(disk: disk2, drive: 1)
             }
 
-            // Restore hard disk selection
-            if !lastHDName.isEmpty, let hd = availableHDs.first(where: { $0.name == lastHDName }) {
+            if !lastHD.isEmpty, let hd = availableHDs.first(where: { $0.name == lastHD }) {
                 selectedHD = hd
                 emulator.mountHardDisk(url: hd.url)
             }
 
-            emulator.turboMode = turboModeSaved
             emulator.start()
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleTurbo)) { _ in
+            guard isKeyWindow else { return }
             emulator.turboMode.toggle()
-            turboModeSaved = emulator.turboMode
         }
         .onReceive(NotificationCenter.default.publisher(for: .takeScreenshot)) { _ in
+            guard isKeyWindow else { return }
             takeScreenshot()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mountDisk1)) { _ in
+            guard isKeyWindow else { return }
+            openDiskPanel(drive: 0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mountDisk2)) { _ in
+            guard isKeyWindow else { return }
+            openDiskPanel(drive: 1)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            guard isKeyWindow else { return }
+            saveDefaults()
+        }
+    }
+
+    private var isKeyWindow: Bool {
+        controlActiveState == .key
+    }
+
+    private func saveDefaults() {
+        let ud = UserDefaults.standard
+        ud.set(vintageFX, forKey: "vintageFX")
+        ud.set(phosphorColorRaw, forKey: "phosphorColor")
+        ud.set(bloomIntensity, forKey: "bloomIntensity")
+        ud.set(scanlineIntensity, forKey: "scanlineIntensity")
+        ud.set(curvatureIntensity, forKey: "curvatureIntensity")
+        ud.set(screenGlowIntensity, forKey: "screenGlowIntensity")
+        ud.set(emulator.turboMode, forKey: "turboMode")
+        ud.set(selectedDisk1?.name ?? "", forKey: "lastDisk1")
+        ud.set(selectedDisk2?.name ?? "", forKey: "lastDisk2")
+        ud.set(selectedHD?.name ?? "", forKey: "lastHD")
+    }
+
+    private func openDiskPanel(drive: Int) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.data]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                emulator.mountDisk(url: url, drive: drive)
+            }
+        }
+    }
+
+    private var toolbarView: some View {
+        HStack(spacing: 10) {
+            Button(emulator.isRunning ? "Pause" : "Resume") {
+                if emulator.isRunning { emulator.stop() } else { emulator.start() }
+            }
+            .keyboardShortcut("p", modifiers: [.command])
+
+            Button("Reset") { emulator.reset() }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+
+            Divider().frame(height: 16)
+
+            Button("Disks") { showDiskControls.toggle() }
+                .popover(isPresented: $showDiskControls) {
+                    DiskControlsView(
+                        selectedDisk1: $selectedDisk1,
+                        selectedDisk2: $selectedDisk2,
+                        selectedHD: $selectedHD,
+                        diskCategories: diskCategories,
+                        availableHDs: availableHDs,
+                        onMountFloppy: { disk, drive in
+                            mountWithValidation(disk: disk, drive: drive)
+                        },
+                        onMountHD: { hd in
+                            emulator.mountHardDisk(url: hd.url)
+                        }
+                    )
+                }
+
+            Button("CRT") { showCRTControls.toggle() }
+                .popover(isPresented: $showCRTControls) {
+                    CRTControlsView(
+                        phosphorColorRaw: $phosphorColorRaw,
+                        vintageFX: $vintageFX,
+                        bloomIntensity: $bloomIntensity,
+                        scanlineIntensity: $scanlineIntensity,
+                        curvatureIntensity: $curvatureIntensity,
+                        screenGlowIntensity: $screenGlowIntensity
+                    )
+                }
+
+            Toggle("Turbo", isOn: $emulator.turboMode)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.bar)
     }
 
     /// Disks grouped by category for sectioned picker
@@ -390,5 +377,98 @@ struct ContentView: View {
         if FileManager.default.fileExists(atPath: desktopPath) {
             NSSound(named: "Grab")?.play()
         }
+    }
+}
+
+struct DiskControlsView: View {
+    @Binding var selectedDisk1: DiskEntry?
+    @Binding var selectedDisk2: DiskEntry?
+    @Binding var selectedHD: DiskEntry?
+    let diskCategories: [(String, [DiskEntry])]
+    let availableHDs: [DiskEntry]
+    var onMountFloppy: (DiskEntry, Int) -> Void
+    var onMountHD: (DiskEntry) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Disk Drives").font(.headline)
+
+            Picker("Drive 1", selection: $selectedDisk1) {
+                Text("None").tag(nil as DiskEntry?)
+                ForEach(diskCategories, id: \.0) { category, disks in
+                    Section(category) {
+                        ForEach(disks) { disk in
+                            Text(disk.name).tag(disk as DiskEntry?)
+                        }
+                    }
+                }
+            }
+            .onChange(of: selectedDisk1) { _, disk in
+                if let disk = disk { onMountFloppy(disk, 0) }
+            }
+
+            Picker("Drive 2", selection: $selectedDisk2) {
+                Text("None").tag(nil as DiskEntry?)
+                ForEach(diskCategories, id: \.0) { category, disks in
+                    Section(category) {
+                        ForEach(disks) { disk in
+                            Text(disk.name).tag(disk as DiskEntry?)
+                        }
+                    }
+                }
+            }
+            .onChange(of: selectedDisk2) { _, disk in
+                if let disk = disk { onMountFloppy(disk, 1) }
+            }
+
+            Divider()
+
+            Picker("Hard Disk", selection: $selectedHD) {
+                Text("None").tag(nil as DiskEntry?)
+                ForEach(availableHDs) { hd in
+                    Text(hd.name).tag(hd as DiskEntry?)
+                }
+            }
+            .onChange(of: selectedHD) { _, hd in
+                if let hd = hd { onMountHD(hd) }
+            }
+        }
+        .padding()
+        .frame(width: 300)
+    }
+}
+
+struct CRTControlsView: View {
+    @Binding var phosphorColorRaw: String
+    @Binding var vintageFX: Bool
+    @Binding var bloomIntensity: Double
+    @Binding var scanlineIntensity: Double
+    @Binding var curvatureIntensity: Double
+    @Binding var screenGlowIntensity: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Display").font(.headline)
+            Picker("Phosphor", selection: $phosphorColorRaw) {
+                ForEach(PhosphorColor.allCases, id: \.self) { color in
+                    Text(color.rawValue).tag(color.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            Divider()
+            Toggle("Vintage FX", isOn: $vintageFX)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            HStack { Text("Bloom"); Spacer(); Slider(value: $bloomIntensity, in: 0...1).frame(width: 120) }
+                .disabled(!vintageFX)
+            HStack { Text("Scanlines"); Spacer(); Slider(value: $scanlineIntensity, in: 0...1).frame(width: 120) }
+                .disabled(!vintageFX)
+            HStack { Text("Curvature"); Spacer(); Slider(value: $curvatureIntensity, in: 0...1).frame(width: 120) }
+                .disabled(!vintageFX)
+            HStack { Text("Brightness"); Spacer(); Slider(value: $screenGlowIntensity, in: 0...1).frame(width: 120) }
+                .disabled(!vintageFX)
+        }
+        .padding()
+        .frame(width: 280)
     }
 }

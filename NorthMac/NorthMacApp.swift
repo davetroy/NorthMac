@@ -3,42 +3,28 @@ import SwiftUI
 extension Notification.Name {
     static let toggleTurbo = Notification.Name("toggleTurbo")
     static let takeScreenshot = Notification.Name("takeScreenshot")
+    static let mountDisk1 = Notification.Name("mountDisk1")
+    static let mountDisk2 = Notification.Name("mountDisk2")
 }
 
 @main
 struct NorthMacApp: App {
-    @StateObject private var emulator = EmulatorCore()
-
     var body: some Scene {
         WindowGroup {
-            ContentView(emulator: emulator)
+            ContentView()
         }
         .commands {
-            // Replace New Window with our File menu items
-            CommandGroup(replacing: .newItem) {
+            // Add disk mount items after the default New Window (Cmd+N)
+            CommandGroup(after: .newItem) {
+                Divider()
+
                 Button("Mount Disk Image...") {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.data]
-                    panel.allowsMultipleSelection = false
-                    panel.canChooseDirectories = false
-                    panel.begin { response in
-                        if response == .OK, let url = panel.url {
-                            emulator.mountDisk(url: url, drive: 0)
-                        }
-                    }
+                    NotificationCenter.default.post(name: .mountDisk1, object: nil)
                 }
                 .keyboardShortcut("o", modifiers: [.command])
 
                 Button("Mount Disk Image to Drive 2...") {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.data]
-                    panel.allowsMultipleSelection = false
-                    panel.canChooseDirectories = false
-                    panel.begin { response in
-                        if response == .OK, let url = panel.url {
-                            emulator.mountDisk(url: url, drive: 1)
-                        }
-                    }
+                    NotificationCenter.default.post(name: .mountDisk2, object: nil)
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
 
