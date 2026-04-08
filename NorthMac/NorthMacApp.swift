@@ -46,9 +46,10 @@ struct NorthMacApp: App {
                     NotificationCenter.default.post(name: .toggleTurbo, object: nil)
                 }
                 .keyboardShortcut("t", modifiers: [.command])
+            }
 
-                Divider()
-
+            // Replace the default Save command with Screenshot
+            CommandGroup(replacing: .saveItem) {
                 Button("Save Screenshot") {
                     MetalDisplayNSView.current?.saveScreenshot()
                 }
