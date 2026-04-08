@@ -205,6 +205,9 @@ struct ContentView: View {
             emulator.turboMode.toggle()
             turboModeSaved = emulator.turboMode
         }
+        .onReceive(NotificationCenter.default.publisher(for: .takeScreenshot)) { _ in
+            takeScreenshot()
+        }
     }
 
     /// Disks grouped by category for sectioned picker
@@ -287,5 +290,46 @@ struct ContentView: View {
             }
         }
         availableHDs = hds
+    }
+
+    private func takeScreenshot() {
+        guard let window = NSApplication.shared.mainWindow,
+              let contentView = window.contentView else {
+            NSLog("Screenshot: no window")
+            return
+        }
+
+        let bounds = contentView.bounds
+        guard let rep = contentView.bitmapImageRepForCachingDisplay(in: bounds) else {
+            NSLog("Screenshot: failed to create bitmap rep")
+            return
+        }
+        contentView.cacheDisplay(in: bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else {
+            NSLog("Screenshot: failed to create PNG")
+            return
+        }
+
+        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd 'at' h.mm.ss a"
+        let filename = "NorthMac Screenshot \(df.string(from: Date())).png"
+        let desktopURL = desktop.appendingPathComponent(filename)
+
+        do {
+            try png.write(to: desktopURL)
+            NSSound(named: "Grab")?.play()
+            NSLog("Screenshot saved: %@", desktopURL.path)
+
+            let screenshotsDir = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Pictures/Screenshots")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                try? FileManager.default.createDirectory(at: screenshotsDir, withIntermediateDirectories: true)
+                let finalURL = screenshotsDir.appendingPathComponent(filename)
+                try? FileManager.default.moveItem(at: desktopURL, to: finalURL)
+            }
+        } catch {
+            NSLog("Screenshot failed: %@", error.localizedDescription)
+        }
     }
 }

@@ -83,7 +83,7 @@ NorthMac/
 
 The Z80 CPU core is based on [superzazu/z80](https://github.com/superzazu/z80), a clean open-source Z80 emulator in C.
 
-The [ADE emulator](https://github.com/jblang/ade) by Jon Lang (based on earlier work) served as an invaluable reference for the NorthStar Advantage I/O architecture, FDC state machine, and memory mapping behavior.
+The [ADE emulator](https://itelsoft.com.au/advantage_emulator.html) by Jack Strangio served as an invaluable reference for the NorthStar Advantage I/O architecture, FDC state machine, and memory mapping behavior.
 
 ## License
 
