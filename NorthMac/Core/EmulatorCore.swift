@@ -23,6 +23,13 @@ final class EmulatorCore: ObservableObject {
     private var instructionCount: Int = 0
     private let floppyPulse = 0x22  // 34 instructions between FDC advances
 
+    // Enable verbose logging for MED3C traps and boot diagnostics
+    #if DEBUG
+    static let debugLogging = false
+    #else
+    static let debugLogging = false
+    #endif
+
     /// Project root directory, derived from this source file's path at compile time.
     /// Used to locate Resources/, Disk Images/, and Hard Disks/ during development.
     static let projectRoot: URL = {
@@ -301,7 +308,7 @@ final class EmulatorCore: ObservableObject {
                         if hasContent {
                             io.keyPress(0x0D)  // ENTER key
                             autoEnterInjected = true
-                            NSLog("AUTO: Injected ENTER key for LOAD SYSTEM prompt")
+                            if Self.debugLogging { NSLog("AUTO: Injected ENTER key for LOAD SYSTEM prompt") }
                         }
                     }
                 }
@@ -361,7 +368,7 @@ final class EmulatorCore: ObservableObject {
 
         let report = lines.joined(separator: "\n") + "\n"
         try? report.write(toFile: "/tmp/northmac_boot_status.txt", atomically: true, encoding: .utf8)
-        NSLog("BOOT STATUS: wrote report to /tmp/northmac_boot_status.txt (%d video bytes active)", nonZero)
+        if Self.debugLogging { NSLog("BOOT STATUS: wrote report to /tmp/northmac_boot_status.txt (%d video bytes active)", nonZero) }
     }
 
     /// Scan boot loader code (F200-F400) for LD A,(nn) / OR A / JP P polling patterns.
@@ -380,7 +387,7 @@ final class EmulatorCore: ObservableObject {
                        memory.readByte(addr &+ offset &+ 1) == 0xF2 {
                         if !med3cPollingAddresses.contains(pollAddr) {
                             med3cPollingAddresses.append(pollAddr)
-                            NSLog("MED3C: found polling addr %04X at code %04X", pollAddr, addr)
+                            if Self.debugLogging { NSLog("MED3C: found polling addr %04X at code %04X", pollAddr, addr) }
                         }
                         break
                     }
@@ -388,8 +395,10 @@ final class EmulatorCore: ObservableObject {
             }
             addr = addr &+ 1
         }
-        NSLog("MED3C: detected %d polling addresses: %@", med3cPollingAddresses.count,
-              med3cPollingAddresses.map { String(format: "%04X", $0) }.joined(separator: ", "))
+        if Self.debugLogging {
+            NSLog("MED3C: detected %d polling addresses: %@", med3cPollingAddresses.count,
+                  med3cPollingAddresses.map { String(format: "%04X", $0) }.joined(separator: ", "))
+        }
     }
 
     /// MED3C trap: polled sector read performed in Swift instead of Z80 PROM code.
@@ -411,8 +420,10 @@ final class EmulatorCore: ObservableObject {
         let retLo = memory.readByte(cpu.sp)
         let retHi = memory.readByte(cpu.sp &+ 1)
         let retAddr = UInt16(retHi) << 8 | UInt16(retLo)
-        NSLog("MED3C trap: A=%02X B=%02X C=%02X D=%02X HL=%04X ret=%04X",
-              cpu.a, cpu.b, cpu.c, cpu.d, dmaAddr, retAddr)
+        if Self.debugLogging {
+            NSLog("MED3C trap: A=%02X B=%02X C=%02X D=%02X HL=%04X ret=%04X",
+                  cpu.a, cpu.b, cpu.c, cpu.d, dmaAddr, retAddr)
+        }
 
         let driveNum = driveCtrl & 0x07
         let driveIdx = max(0, driveNum - 1)  // convert to 0-based
@@ -424,7 +435,7 @@ final class EmulatorCore: ObservableObject {
             cpu.nf = false
             cpu.cf = false
             popReturnAddress()
-            NSLog("MED3C trap: no disk in drive %d", driveNum)
+            if Self.debugLogging { NSLog("MED3C trap: no disk in drive %d", driveNum) }
             return
         }
 
@@ -461,8 +472,10 @@ final class EmulatorCore: ObservableObject {
                 dmaAddr = dmaAddr &+ 1
             }
 
-            NSLog("MED3C trap: %d/%d physTrack=%d side=%d sector=%d offset=0x%X",
-                  i + 1, sectorCount, physTrack, side, sector, offset)
+            if Self.debugLogging {
+                NSLog("MED3C trap: %d/%d physTrack=%d side=%d sector=%d offset=0x%X",
+                      i + 1, sectorCount, physTrack, side, sector, offset)
+            }
 
             sector += 1
             if sector >= 10 {
@@ -506,7 +519,7 @@ final class EmulatorCore: ObservableObject {
                         memory.writeByte(pollAddr, 0x80)
                         if !med3cPollingAddresses.contains(pollAddr) {
                             med3cPollingAddresses.append(pollAddr)
-                            NSLog("MED3C: new polling addr %04X from code %04X", pollAddr, addr)
+                            if Self.debugLogging { NSLog("MED3C: new polling addr %04X from code %04X", pollAddr, addr) }
                         }
                         break
                     }
