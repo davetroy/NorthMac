@@ -294,42 +294,74 @@ struct ContentView: View {
 
     private func takeScreenshot() {
         guard let window = NSApplication.shared.mainWindow,
-              let contentView = window.contentView else {
-            NSLog("Screenshot: no window")
+              let metalView = MetalDisplayNSView.current else {
+            NSSound.beep()
             return
         }
 
-        let bounds = contentView.bounds
-        guard let rep = contentView.bitmapImageRepForCachingDisplay(in: bounds) else {
-            NSLog("Screenshot: failed to create bitmap rep")
-            return
-        }
-        contentView.cacheDisplay(in: bounds, to: rep)
-        guard let png = rep.representation(using: .png, properties: [:]) else {
-            NSLog("Screenshot: failed to create PNG")
-            return
-        }
-
-        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd 'at' h.mm.ss a"
         let filename = "NorthMac Screenshot \(df.string(from: Date())).png"
-        let desktopURL = desktop.appendingPathComponent(filename)
+        // Use the system screenshot location (defaults read com.apple.screencapture location)
+        let screenshotDir: String
+        let task0 = Process()
+        let pipe0 = Pipe()
+        task0.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+        task0.arguments = ["read", "com.apple.screencapture", "location"]
+        task0.standardOutput = pipe0
+        task0.standardError = FileHandle.nullDevice
+        try? task0.run()
+        task0.waitUntilExit()
+        let dirOutput = String(data: pipe0.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !dirOutput.isEmpty {
+            screenshotDir = NSString(string: dirOutput).expandingTildeInPath
+        } else {
+            screenshotDir = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!.path
+        }
+        try? FileManager.default.createDirectory(atPath: screenshotDir, withIntermediateDirectories: true)
+        let desktopPath = (screenshotDir as NSString).appendingPathComponent(filename)
 
-        do {
-            try png.write(to: desktopURL)
-            NSSound(named: "Grab")?.play()
-            NSLog("Screenshot saved: %@", desktopURL.path)
+        // Capture whole window with screencapture -l (already permitted)
+        let tmpPath = NSTemporaryDirectory() + "northmac_tmp_screenshot.png"
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        task.arguments = ["-l", "\(window.windowNumber)", tmpPath]
+        try? task.run()
+        task.waitUntilExit()
 
-            let screenshotsDir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Pictures/Screenshots")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                try? FileManager.default.createDirectory(at: screenshotsDir, withIntermediateDirectories: true)
-                let finalURL = screenshotsDir.appendingPathComponent(filename)
-                try? FileManager.default.moveItem(at: desktopURL, to: finalURL)
+        guard let fullImage = NSImage(contentsOfFile: tmpPath),
+              let fullRep = fullImage.tiffRepresentation,
+              let fullBitmap = NSBitmapImageRep(data: fullRep),
+              let fullCG = fullBitmap.cgImage else {
+            try? FileManager.default.removeItem(atPath: tmpPath)
+            return
+        }
+
+        // Calculate Metal view rect within window (in backing pixels)
+        let viewFrame = metalView.convert(metalView.bounds, to: nil)
+        let windowHeight = window.frame.height
+        let scale = window.backingScaleFactor
+
+        let cropRect = CGRect(
+            x: viewFrame.origin.x * scale,
+            y: (windowHeight - viewFrame.maxY) * scale,
+            width: viewFrame.width * scale,
+            height: viewFrame.height * scale
+        )
+
+        // Crop to just the CRT display
+        if let cropped = fullCG.cropping(to: cropRect) {
+            let rep = NSBitmapImageRep(cgImage: cropped)
+            if let png = rep.representation(using: .png, properties: [:]) {
+                try? png.write(to: URL(fileURLWithPath: desktopPath))
             }
-        } catch {
-            NSLog("Screenshot failed: %@", error.localizedDescription)
+        }
+
+        try? FileManager.default.removeItem(atPath: tmpPath)
+
+        if FileManager.default.fileExists(atPath: desktopPath) {
+            NSSound(named: "Grab")?.play()
         }
     }
 }
