@@ -2,9 +2,8 @@
 
 A NorthStar Advantage (circa 1982) emulator for macOS, built with SwiftUI and Metal.
 
-![NorthMac Icon](NorthMac/Assets.xcassets/AppIcon.appiconset/icon_512x512.png)
-
 <p align="center">
+![NorthMac Icon](NorthMac/Assets.xcassets/AppIcon.appiconset/icon_512x512.png)
   <img src="Screenshots/northstar-demo.png" width="48%" alt="NorthStar demo screen">
   <img src="Screenshots/3d-surface.png" width="48%" alt="3D surface plot">
 </p>
