@@ -59,7 +59,9 @@ final class EmulatorCore: ObservableObject {
         }
     }
 
-    func loadBootROM() {
+    /// Loads boot ROM from bundle or Application Support. Returns true on success.
+    @discardableResult
+    func loadBootROM() -> Bool {
         // Try bundle first, then file system
         var romData: Data?
 
@@ -77,11 +79,12 @@ final class EmulatorCore: ObservableObject {
 
         guard let data = romData else {
             print("ERROR: Could not load boot ROM")
-            return
+            return false
         }
 
         memory.loadBootROM(data: Array(data))
         print("Boot ROM loaded: \(data.count) bytes")
+        return true
     }
 
     func mountDisk(url: URL, drive: Int) {

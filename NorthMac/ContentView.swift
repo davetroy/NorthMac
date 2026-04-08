@@ -24,6 +24,8 @@ struct ContentView: View {
     @State private var showCRTControls = false
     @State private var diskWarning: String?
     @State private var showDiskWarning = false
+    @State private var setupWarning: String?
+    @State private var showSetupWarning = false
     @AppStorage("vintageFX") private var vintageFX = true
     @AppStorage("phosphorColor") private var phosphorColorRaw = "Green"
     @AppStorage("bloomIntensity") private var bloomIntensity: Double = 0.6
@@ -174,9 +176,32 @@ struct ContentView: View {
         } message: {
             Text(diskWarning ?? "")
         }
+        .alert("Setup Required", isPresented: $showSetupWarning) {
+            Button("OK") { }
+        } message: {
+            Text(setupWarning ?? "")
+        }
         .onAppear {
             scanForDisks()
-            emulator.loadBootROM()
+            let romLoaded = emulator.loadBootROM()
+
+            // Notify user about missing resources
+            var missing: [String] = []
+            if !romLoaded {
+                missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
+            }
+            if availableDisks.isEmpty {
+                missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
+            }
+            if !missing.isEmpty {
+                setupWarning = "The following resources are missing:\n\n"
+                    + missing.joined(separator: "\n")
+                    + "\n\nSee README.md for details on where to find these files."
+                // Defer alert to next run loop so the window is ready to present it
+                DispatchQueue.main.async {
+                    showSetupWarning = true
+                }
+            }
 
             // Restore last disk selections, or fall back to defaults
             // Prefer Advantage disks for auto-selection
