@@ -3,7 +3,6 @@
 A NorthStar Advantage (circa 1982) emulator for macOS, built with SwiftUI and Metal.
 
 <p align="center">
-![NorthMac Icon](NorthMac/Assets.xcassets/AppIcon.appiconset/icon_512x512.png)
   <img src="Screenshots/northstar-demo.png" width="48%" alt="NorthStar demo screen">
   <img src="Screenshots/3d-surface.png" width="48%" alt="3D surface plot">
 </p>
@@ -13,6 +12,8 @@ A NorthStar Advantage (circa 1982) emulator for macOS, built with SwiftUI and Me
 NorthMac emulates the NorthStar Advantage Z80-based microcomputer — an all-in-one machine with a built-in CRT, dual 5.25" floppy drives, and a bitmap graphics display. The emulator boots real CP/M disk images and runs vintage software.
 
 ### Features
+
+![NorthMac Icon](NorthMac/Assets.xcassets/AppIcon.appiconset/icon_512x512.png)
 
 - **Full Z80 CPU** emulation via C core (z80.c/z80.h)
 - **256KB memory** with bank switching (4 x 16KB mapping registers)
