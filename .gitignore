@@ -1,0 +1,13 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Disk images (copyrighted software — not distributed)
+*.NSI
+*.nsi
+*.NHD
+*.nhd
+
+# Boot ROM (copyrighted NorthStar firmware)
+AdvantageBootRom.bin
