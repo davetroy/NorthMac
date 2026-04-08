@@ -23,7 +23,20 @@ final class EmulatorCore: ObservableObject {
     private var instructionCount: Int = 0
     private let floppyPulse = 0x22  // 34 instructions between FDC advances
 
+    /// Project root directory, derived from this source file's path at compile time.
+    /// Used to locate Resources/, Disk Images/, and Hard Disks/ during development.
+    static let projectRoot: URL = {
+        // #filePath is .../NorthMac/NorthMac/Core/EmulatorCore.swift
+        // Project root is three levels up
+        let thisFile = URL(fileURLWithPath: #filePath)
+        return thisFile
+            .deletingLastPathComponent()  // Core/
+            .deletingLastPathComponent()  // NorthMac/
+            .deletingLastPathComponent()  // project root
+    }()
+
     init() {
+        turboMode = UserDefaults.standard.bool(forKey: "turboMode")
         io.emulator = self
         fdc.onBeep = { [weak self] in self?.audio.beep() }
         setupCPU()
@@ -75,6 +88,12 @@ final class EmulatorCore: ObservableObject {
             if let romURL = appSupport?.appendingPathComponent("NorthMac/AdvantageBootRom.bin") {
                 romData = try? Data(contentsOf: romURL)
             }
+        }
+
+        if romData == nil {
+            // Try project root (for development builds)
+            let romURL = Self.projectRoot.appendingPathComponent("Resources/AdvantageBootRom.bin")
+            romData = try? Data(contentsOf: romURL)
         }
 
         guard let data = romData else {

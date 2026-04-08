@@ -261,7 +261,8 @@ struct ContentView: View {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         let diskImagesDirs = [
             Bundle.main.resourceURL?.appendingPathComponent("Disk Images").path,
-            appSupport?.appendingPathComponent("NorthMac/Disk Images").path
+            appSupport?.appendingPathComponent("NorthMac/Disk Images").path,
+            EmulatorCore.projectRoot.appendingPathComponent("Disk Images").path
         ].compactMap { $0 }
 
         let categories = ["Bootable", "Non-Bootable", "Unknown"]
@@ -289,7 +290,8 @@ struct ContentView: View {
         var hds: [DiskEntry] = []
         let hdDirs = [
             Bundle.main.resourceURL?.appendingPathComponent("Hard Disks").path,
-            appSupport?.appendingPathComponent("NorthMac/Hard Disks").path
+            appSupport?.appendingPathComponent("NorthMac/Hard Disks").path,
+            EmulatorCore.projectRoot.appendingPathComponent("Hard Disks").path
         ].compactMap { $0 }
         for dir in hdDirs {
             guard let items = try? fm.contentsOfDirectory(atPath: dir) else { continue }

@@ -1,0 +1,11 @@
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+DerivedData/
+
+# Copyrighted ROM and disk images
+*.NSI
+*.nsi
+*.NHD
+*.nhd
+*.bin
