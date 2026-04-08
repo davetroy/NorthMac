@@ -4,6 +4,11 @@ A NorthStar Advantage (circa 1982) emulator for macOS, built with SwiftUI and Me
 
 ![NorthMac Icon](NorthMac/Assets.xcassets/AppIcon.appiconset/icon_512x512.png)
 
+<p align="center">
+  <img src="Screenshots/northstar-demo.png" width="48%" alt="NorthStar demo screen">
+  <img src="Screenshots/3d-surface.png" width="48%" alt="3D surface plot">
+</p>
+
 ## What It Does
 
 NorthMac emulates the NorthStar Advantage Z80-based microcomputer — an all-in-one machine with a built-in CRT, dual 5.25" floppy drives, and a bitmap graphics display. The emulator boots real CP/M disk images and runs vintage software.
@@ -40,9 +45,9 @@ Requires Xcode 15+ and macOS 14+.
 
 Disk images (`.NSI`, `.NHD`) and the boot ROM (`AdvantageBootRom.bin`) are **not included** for copyright reasons.
 
-- Place the Advantage Boot ROM as `~/Library/Application Support/NorthMac/AdvantageBootRom.bin`
-- Place floppy disk images in `NorthMac/Disk Images/Bootable/`
-- Place hard disk images in `NorthMac/Hard Disks/`
+- Place the Advantage Boot ROM as `Resources/AdvantageBootRom.bin`
+- Place floppy disk images in `Disk Images/Bootable/`
+- Place hard disk images in `Hard Disks/`
 
 These can be found in various vintage computing archives and preservation sites. A good collection of NorthStar Advantage disk images is available from [Dave Dunfield's classiccmp archive](http://dunfield.classiccmp.org/img42841/d/nsadvan.zip). Boot ROMs, documentation, and additional resources are available from [djones60/NorthStar-Advantage](https://github.com/djones60/NorthStar-Advantage).
 
