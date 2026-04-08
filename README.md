@@ -44,7 +44,7 @@ Disk images (`.NSI`, `.NHD`) and the boot ROM (`AdvantageBootRom.bin`) are **not
 - Place floppy disk images in `NorthMac/Disk Images/Bootable/`
 - Place hard disk images in `NorthMac/Hard Disks/`
 
-These can be found in various vintage computing archives and preservation sites. A good collection of NorthStar Advantage disk images is available from [Dave Dunfield's classiccmp archive](http://dunfield.classiccmp.org/img42841/d/nsadvan.zip).
+These can be found in various vintage computing archives and preservation sites. A good collection of NorthStar Advantage disk images is available from [Dave Dunfield's classiccmp archive](http://dunfield.classiccmp.org/img42841/d/nsadvan.zip). Boot ROMs, documentation, and additional resources are available from [djones60/NorthStar-Advantage](https://github.com/djones60/NorthStar-Advantage).
 
 ## Keyboard Shortcuts
 
