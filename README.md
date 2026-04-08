@@ -40,7 +40,7 @@ Requires Xcode 15+ and macOS 14+.
 
 Disk images (`.NSI`, `.NHD`) and the boot ROM (`AdvantageBootRom.bin`) are **not included** for copyright reasons.
 
-- Place the Advantage Boot ROM as `NorthMac/Resources/AdvantageBootRom.bin`
+- Place the Advantage Boot ROM as `~/Library/Application Support/NorthMac/AdvantageBootRom.bin`
 - Place floppy disk images in `NorthMac/Disk Images/Bootable/`
 - Place hard disk images in `NorthMac/Hard Disks/`
 
@@ -88,6 +88,8 @@ The [ADE emulator](https://itelsoft.com.au/advantage_emulator.html) by Jack Stra
 ## License
 
 MIT
+
+Copyright © 2026 David Troy
 
 ---
 

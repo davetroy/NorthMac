@@ -68,16 +68,10 @@ final class EmulatorCore: ObservableObject {
         }
 
         if romData == nil {
-            // Try relative path from the project
-            let paths = [
-                "/Users/davetroy/Development/Personal/northstar/NorthStar-Advantage/Advantage Boot Rom.BIN",
-                "/Users/davetroy/Development/Personal/northstar/nsmac/NorthMac/NorthMac/Resources/AdvantageBootRom.bin"
-            ]
-            for path in paths {
-                if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-                    romData = data
-                    break
-                }
+            // Try user's Application Support directory
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            if let romURL = appSupport?.appendingPathComponent("NorthMac/AdvantageBootRom.bin") {
+                romData = try? Data(contentsOf: romURL)
             }
         }
 

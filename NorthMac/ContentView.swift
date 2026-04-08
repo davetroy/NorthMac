@@ -233,10 +233,10 @@ struct ContentView: View {
         var disks: [DiskEntry] = []
 
         // Disk images live in categorized subfolders of "Disk Images/"
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         let diskImagesDirs = [
             Bundle.main.resourceURL?.appendingPathComponent("Disk Images").path,
-            // Fallback for development (not in bundle)
-            "/Users/davetroy/Development/Personal/northstar/nsmac/NorthMac/NorthMac/Disk Images"
+            appSupport?.appendingPathComponent("NorthMac/Disk Images").path
         ].compactMap { $0 }
 
         let categories = ["Bootable", "Non-Bootable", "Unknown"]
@@ -264,7 +264,7 @@ struct ContentView: View {
         var hds: [DiskEntry] = []
         let hdDirs = [
             Bundle.main.resourceURL?.appendingPathComponent("Hard Disks").path,
-            "/Users/davetroy/Development/Personal/northstar/nsmac/NorthMac/NorthMac/Hard Disks"
+            appSupport?.appendingPathComponent("NorthMac/Hard Disks").path
         ].compactMap { $0 }
         for dir in hdDirs {
             guard let items = try? fm.contentsOfDirectory(atPath: dir) else { continue }
