@@ -25,7 +25,7 @@ NorthMac emulates the NorthStar Advantage Z80-based microcomputer — an all-in-
 - **Keyboard input** via macOS key events mapped to NorthStar scan codes
 - **Audio** with programmable speaker emulation
 - **Turbo mode** (Cmd+T) for maximum speed
-- **Screenshots** (Cmd+S) saved to Desktop like macOS Finder
+- **Screenshots** (Cmd+S) saved to your preferred location
 
 ### What Boots
 
