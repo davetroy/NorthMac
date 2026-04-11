@@ -311,6 +311,9 @@ final class EmulatorCore: ObservableObject {
             if frameCycles >= cyclesPerFrame {
                 frameCycles = 0
 
+                // Pause audio engine during sustained silence
+                audio.checkSilence()
+
                 // Auto-inject ENTER key for "LOAD SYSTEM" prompt during automated testing
                 if !autoEnterInjected {
                     autoEnterDelay += 1

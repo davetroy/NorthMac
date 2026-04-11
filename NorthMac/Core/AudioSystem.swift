@@ -36,6 +36,11 @@ final class AudioSystem {
     // Lock for thread-safe state access
     private let lock = NSLock()
 
+    // Engine pause/resume for silence detection
+    private var engineRunning = true
+    private var silentFrames: Int = 0
+    private let silencePauseThreshold: Int = 44100  // ~1 second of silence before pausing
+
     init() {
         setupAudioEngine()
     }
@@ -122,6 +127,7 @@ final class AudioSystem {
 
     /// Generate a standard beep (called on port 0x83 IN from boot ROM)
     func beep() {
+        ensureEngineRunning()
         lock.lock()
         beepSamplesRemaining = Int(sampleRate * 0.15)  // 150ms beep
         beepPhase = 0.0
@@ -138,7 +144,6 @@ final class AudioSystem {
 
         if wasHigh != high {
             // Measure half-period in audio samples
-            // Convert from emulator-thread timing to approximate audio samples
             let now = currentSample
             if lastToggleSample > 0 {
                 toggleHalfPeriodSamples = now - lastToggleSample
@@ -146,13 +151,47 @@ final class AudioSystem {
             lastToggleSample = now
             samplesSinceLastToggle = 0
             speakerToggleActive = true
+
+            // Resume engine if it was paused for silence
+            if !engineRunning {
+                lock.unlock()
+                ensureEngineRunning()
+                return
+            }
         }
 
-        // Advance our sample counter estimate (~44100 samples/sec at 4MHz = ~91 Z80 cycles per sample)
-        // Each call corresponds to one I/O port write, roughly every few hundred cycles
         currentSample += 1
-
         lock.unlock()
+    }
+
+    /// Resume the audio engine if it was paused
+    private func ensureEngineRunning() {
+        guard !engineRunning, let engine = audioEngine else { return }
+        do {
+            try engine.start()
+            engineRunning = true
+        } catch {
+            NSLog("AudioSystem: failed to resume: %@", error.localizedDescription)
+        }
+    }
+
+    /// Called periodically from the emulator to pause engine during sustained silence
+    func checkSilence() {
+        lock.lock()
+        let isSilent = beepSamplesRemaining <= 0 &&
+                        samplesSinceLastToggle > decayThreshold
+        lock.unlock()
+
+        if isSilent && engineRunning {
+            silentFrames += 1
+            if silentFrames > 60 {  // ~1 second at 60fps
+                audioEngine?.pause()
+                engineRunning = false
+                silentFrames = 0
+            }
+        } else {
+            silentFrames = 0
+        }
     }
 
     /// Called periodically from emulator to sync sample counter with real time
