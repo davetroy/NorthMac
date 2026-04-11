@@ -90,7 +90,7 @@ final class EmulatorCore: ObservableObject {
     }
 
     func mountDisk(url: URL, drive: Int) {
-        guard let data = try? Data(contentsOf: url) else {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
             print("ERROR: Could not load disk image from \(url)")
             return
         }
@@ -99,7 +99,7 @@ final class EmulatorCore: ObservableObject {
     }
 
     func mountHardDisk(url: URL) {
-        guard let data = try? Data(contentsOf: url) else {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
             print("ERROR: Could not load hard disk image from \(url)")
             return
         }

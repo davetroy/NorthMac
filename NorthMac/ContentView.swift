@@ -73,11 +73,8 @@ struct ContentView: View {
             Text(setupWarning ?? "")
         }
         .onAppear {
-            // Use shared cache — first window triggers the load, subsequent windows
-            // get cached results instantly with no I/O.
             ResourceCache.shared.ensureLoaded { [self] in
                 let cache = ResourceCache.shared
-                let romLoaded = emulator.loadBootROM()
 
                 availableDisks = cache.availableDisks
                 availableHDs = cache.availableHDs
@@ -89,22 +86,17 @@ struct ContentView: View {
                 let disk1 = availableDisks.first(where: { $0.name == lastDisk1 })
                     ?? availableDisks.first(where: { $0.name == "advf2_cpm120_wm" })
                     ?? availableDisks.first(where: { $0.validation.isValid })
-                if let disk1 = disk1 {
-                    selectedDisk1 = disk1
-                    emulator.mountDisk(url: disk1.url, drive: 0)
-                }
-                if !lastDisk2.isEmpty, let disk2 = availableDisks.first(where: { $0.name == lastDisk2 }) {
-                    selectedDisk2 = disk2
-                    emulator.mountDisk(url: disk2.url, drive: 1)
-                }
-                if !lastHD.isEmpty, let hd = availableHDs.first(where: { $0.name == lastHD }) {
-                    selectedHD = hd
-                    emulator.mountHardDisk(url: hd.url)
-                }
+                let disk2 = lastDisk2.isEmpty ? nil : availableDisks.first(where: { $0.name == lastDisk2 })
+                let hd = lastHD.isEmpty ? nil : availableHDs.first(where: { $0.name == lastHD })
+
+                if let disk1 = disk1 { selectedDisk1 = disk1 }
+                if let disk2 = disk2 { selectedDisk2 = disk2 }
+                if let hd = hd { selectedHD = hd }
 
                 // Notify user about missing resources
+                let romAvailable = cache.bootROMData != nil
                 var missing: [String] = []
-                if !romLoaded {
+                if !romAvailable {
                     missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
                 }
                 if availableDisks.isEmpty {
@@ -117,7 +109,16 @@ struct ContentView: View {
                     showSetupWarning = true
                 }
 
-                emulator.start()
+                let emulator = self.emulator
+                DispatchQueue.global(qos: .userInitiated).async {
+                    emulator.loadBootROM()
+                    if let disk1 = disk1 { emulator.mountDisk(url: disk1.url, drive: 0) }
+                    if let disk2 = disk2 { emulator.mountDisk(url: disk2.url, drive: 1) }
+                    if let hd = hd { emulator.mountHardDisk(url: hd.url) }
+                    DispatchQueue.main.async {
+                        emulator.start()
+                    }
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleTurbo)) { _ in

@@ -10,8 +10,6 @@ extension Notification.Name {
 @main
 struct NorthMacApp: App {
     init() {
-        // Kick off resource loading and shader compilation early so the first
-        // window doesn't pay the full cost. Both are no-ops on subsequent calls.
         ResourceCache.shared.ensureLoaded {}
         MetalDisplayNSView.precompileShader()
     }
