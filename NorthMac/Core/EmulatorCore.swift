@@ -6,7 +6,7 @@ import CoreGraphics
 /// Main emulator orchestrating Z80 CPU, memory, I/O, FDC, and display
 final class EmulatorCore: ObservableObject {
     @Published var isRunning = false
-    @Published var turboMode = false
+    @Published var turboMode = UserDefaults.standard.bool(forKey: "turboMode")
 
     let memory = MemorySystem()
     let fdc = FloppyDiskController()
@@ -43,7 +43,6 @@ final class EmulatorCore: ObservableObject {
     }()
 
     init() {
-        turboMode = UserDefaults.standard.bool(forKey: "turboMode")
         io.emulator = self
         fdc.onBeep = { [weak self] in self?.audio.beep() }
         setupCPU()
