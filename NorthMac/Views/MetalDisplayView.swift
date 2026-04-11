@@ -73,12 +73,17 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Float>.size)
 
         // Video RAM texture (80 bytes × 256 lines, R8)
+        // Use .shared on Apple Silicon (unified memory) to avoid blit sync overhead
         let texDesc = MTLTextureDescriptor()
         texDesc.width = 80
         texDesc.height = 256
         texDesc.pixelFormat = .r8Unorm
         texDesc.usage = [.shaderRead]
+        #if arch(arm64)
+        texDesc.storageMode = .shared
+        #else
         texDesc.storageMode = .managed
+        #endif
         videoTexture = device.makeTexture(descriptor: texDesc)
     }
 
