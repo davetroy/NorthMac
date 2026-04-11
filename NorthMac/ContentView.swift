@@ -73,50 +73,54 @@ struct ContentView: View {
             Text(setupWarning ?? "")
         }
         .onAppear {
-            scanForDisks()
-            let romLoaded = emulator.loadBootROM()
+            // Load boot ROM and scan disks concurrently on a background queue
+            // to avoid blocking the window from appearing.
+            let emulator = self.emulator
+            DispatchQueue.global(qos: .userInitiated).async {
+                let romLoaded = emulator.loadBootROM()
 
-            // Notify user about missing resources
-            var missing: [String] = []
-            if !romLoaded {
-                missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
-            }
-            if availableDisks.isEmpty {
-                missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
-            }
-            if !missing.isEmpty {
-                setupWarning = "The following resources are missing:\n\n"
-                    + missing.joined(separator: "\n")
-                    + "\n\nSee README.md for details on where to find these files."
-                // Defer alert to next run loop so the window is ready to present it
+                // scanForDisks is a mutating method on self — call the static helper
+                let (disks, hds) = Self.scanForDisksAsync()
+
+                let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
+                let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
+                let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
+
+                let disk1 = disks.first(where: { $0.name == lastDisk1 })
+                    ?? disks.first(where: { $0.name == "advf2_cpm120_wm" })
+                    ?? disks.first(where: { $0.validation.isValid })
+                let disk2 = lastDisk2.isEmpty ? nil : disks.first(where: { $0.name == lastDisk2 })
+                let hd = lastHD.isEmpty ? nil : hds.first(where: { $0.name == lastHD })
+
+                if let disk1 = disk1 { emulator.mountDisk(url: disk1.url, drive: 0) }
+                if let disk2 = disk2 { emulator.mountDisk(url: disk2.url, drive: 1) }
+                if let hd = hd { emulator.mountHardDisk(url: hd.url) }
+
                 DispatchQueue.main.async {
-                    showSetupWarning = true
+                    self.availableDisks = disks
+                    self.availableHDs = hds
+                    if let disk1 = disk1 { self.selectedDisk1 = disk1 }
+                    if let disk2 = disk2 { self.selectedDisk2 = disk2 }
+                    if let hd = hd { self.selectedHD = hd }
+
+                    // Notify user about missing resources
+                    var missing: [String] = []
+                    if !romLoaded {
+                        missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
+                    }
+                    if disks.isEmpty {
+                        missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
+                    }
+                    if !missing.isEmpty {
+                        self.setupWarning = "The following resources are missing:\n\n"
+                            + missing.joined(separator: "\n")
+                            + "\n\nSee README.md for details on where to find these files."
+                        self.showSetupWarning = true
+                    }
+
+                    emulator.start()
                 }
             }
-
-            // Restore last disk selections, or fall back to defaults
-            let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
-            let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
-            let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
-
-            let disk1 = availableDisks.first(where: { $0.name == lastDisk1 })
-                ?? availableDisks.first(where: { $0.name == "advf2_cpm120_wm" })
-                ?? availableDisks.first(where: { $0.validation.isValid })
-            if let disk1 = disk1 {
-                selectedDisk1 = disk1
-                mountWithValidation(disk: disk1, drive: 0)
-            }
-            if !lastDisk2.isEmpty, let disk2 = availableDisks.first(where: { $0.name == lastDisk2 }) {
-                selectedDisk2 = disk2
-                mountWithValidation(disk: disk2, drive: 1)
-            }
-
-            if !lastHD.isEmpty, let hd = availableHDs.first(where: { $0.name == lastHD }) {
-                selectedHD = hd
-                emulator.mountHardDisk(url: hd.url)
-            }
-
-            emulator.start()
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleTurbo)) { _ in
             guard isKeyWindow else { return }
@@ -240,12 +244,12 @@ struct ContentView: View {
         emulator.mountDisk(url: disk.url, drive: drive)
     }
 
-    private func scanForDisks() {
+    /// Scan for disk images on a background thread. Returns (floppies, hard disks).
+    private static func scanForDisksAsync() -> ([DiskEntry], [DiskEntry]) {
         let fm = FileManager.default
         var disks: [DiskEntry] = []
 
-        // Disk images live in categorized subfolders of "Disk Images/"
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
         let diskImagesDirs = [
             Bundle.main.resourceURL?.appendingPathComponent("Disk Images").path,
             appSupport?.appendingPathComponent("NorthMac/Disk Images").path,
@@ -261,19 +265,15 @@ struct ContentView: View {
                 for item in items.sorted() where item.uppercased().hasSuffix(".NSI") {
                     let full = (dir as NSString).appendingPathComponent(item)
                     let name = (item as NSString).deletingPathExtension
-                    // Deduplicate by name (bundle takes priority over dev path)
                     guard !disks.contains(where: { $0.name == name }) else { continue }
                     let url = URL(fileURLWithPath: full)
-                    let validation = DiskImage.validate(url: url)
+                    let validation = DiskImage.quickValidate(url: url)
                     disks.append(DiskEntry(id: full, name: name, url: url,
                                            category: category, validation: validation))
                 }
             }
         }
 
-        availableDisks = disks
-
-        // Scan for hard disk images (.nhd/.NHD)
         var hds: [DiskEntry] = []
         let hdDirs = [
             Bundle.main.resourceURL?.appendingPathComponent("Hard Disks").path,
@@ -287,7 +287,6 @@ struct ContentView: View {
                 guard !hds.contains(where: { $0.name == name }) else { continue }
                 let full = (dir as NSString).appendingPathComponent(item)
                 let url = URL(fileURLWithPath: full)
-                // Quick validation: check magic bytes
                 let valid: Bool
                 if let data = try? Data(contentsOf: url, options: .mappedIfSafe),
                    data.count >= 128, data[0] == 0x00, data[1] == 0xFF {
@@ -303,7 +302,7 @@ struct ContentView: View {
                                      category: "Hard Disk", validation: validation))
             }
         }
-        availableHDs = hds
+        return (disks, hds)
     }
 
     private func takeScreenshot() {

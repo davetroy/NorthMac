@@ -81,11 +81,38 @@ struct DiskImage {
     /// Validate an NSI disk image file without fully loading it.
     /// Returns validation result with platform detection and warnings.
     static func validate(url: URL) -> ValidationResult {
-        guard let data = try? Data(contentsOf: url) else {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
             return ValidationResult(isValid: false, isBootable: false, format: nil, platform: .unknown,
                                     hasMED3C: false, warnings: ["Cannot read file"])
         }
         return validate(data: data, name: url.lastPathComponent)
+    }
+
+    /// Quick validation using only file size (no I/O beyond stat).
+    /// Used for initial disk scanning to avoid reading every file on the main thread.
+    static func quickValidate(url: URL) -> ValidationResult {
+        let fm = FileManager.default
+        guard let attrs = try? fm.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int else {
+            return ValidationResult(isValid: false, isBootable: false, format: nil, platform: .unknown,
+                                    hasMED3C: false, warnings: ["Cannot read file"])
+        }
+        let format: Format?
+        var warnings: [String] = []
+        switch size {
+        case 358_400: format = .dsdd
+        case 179_200: format = .ssdd
+        case 89_600:
+            format = .sssd
+            warnings.append("Single density (256-byte sectors) — not yet supported by emulator")
+        default:
+            format = nil
+            warnings.append("Invalid size: \(size) bytes (expected 89600, 179200, or 358400)")
+        }
+        let isValid = format != nil
+        return ValidationResult(isValid: isValid, isBootable: isValid, format: format,
+                                platform: isValid ? .advantage : .unknown,
+                                hasMED3C: false, warnings: warnings)
     }
 
     /// Validate NSI disk image data.
