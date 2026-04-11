@@ -46,35 +46,24 @@ static const uint8_t cyc_ddfd[256] = {4, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4,
 #define GET_BIT(n, val) (((val) >> (n)) & 1)
 
 static inline uint8_t rb(z80* const z, uint16_t addr) {
-  if (z->use_direct_memory) {
-    return z->ram[z->mapping_regs[addr >> 14] + (addr & 0x3FFF)];
-  }
-  return z->read_byte(z->userdata, addr);
+  return z->ram[z->mapping_regs[addr >> 14] + (addr & 0x3FFF)];
 }
 
 static inline void wb(z80* const z, uint16_t addr, uint8_t val) {
-  if (z->use_direct_memory) {
-    int phys = z->mapping_regs[addr >> 14] + (addr & 0x3FFF);
-    // Pages 0-3 (0x00000-0x0FFFF): main RAM — writable
-    // Pages 8-9 (0x20000-0x27FFF): video RAM — writable
-    if (phys < 0x10000) {
-      z->ram[phys] = val;
-    } else if (phys >= 0x20000 && phys < 0x28000) {
-      z->ram[phys] = val;
-      z->video_dirty = true;
-    }
-    return;
+  int phys = z->mapping_regs[addr >> 14] + (addr & 0x3FFF);
+  // Pages 0-3 (0x00000-0x0FFFF): main RAM — writable
+  // Pages 8-9 (0x20000-0x27FFF): video RAM — writable
+  if (phys < 0x10000) {
+    z->ram[phys] = val;
+  } else if (phys >= 0x20000 && phys < 0x28000) {
+    z->ram[phys] = val;
+    z->video_dirty = true;
   }
-  z->write_byte(z->userdata, addr, val);
 }
 
 static inline uint16_t rw(z80* const z, uint16_t addr) {
-  if (z->use_direct_memory) {
-    return (z->ram[z->mapping_regs[(uint16_t)(addr + 1) >> 14] + ((addr + 1) & 0x3FFF)] << 8) |
-            z->ram[z->mapping_regs[addr >> 14] + (addr & 0x3FFF)];
-  }
-  return (z->read_byte(z->userdata, addr + 1) << 8) |
-         z->read_byte(z->userdata, addr);
+  return (z->ram[z->mapping_regs[(uint16_t)(addr + 1) >> 14] + ((addr + 1) & 0x3FFF)] << 8) |
+          z->ram[z->mapping_regs[addr >> 14] + (addr & 0x3FFF)];
 }
 
 static inline void ww(z80* const z, uint16_t addr, uint16_t val) {
