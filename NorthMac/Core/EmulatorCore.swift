@@ -23,6 +23,13 @@ final class EmulatorCore: ObservableObject {
     private var instructionCount: Int = 0
     private let floppyPulse = 0x22  // 34 instructions between FDC advances
 
+    // Set by IOSystem when mapping registers change; synced to CPU after z80_step
+    var mappingRegsDirty = false
+
+    // Performance benchmark: published so UI can display
+    @Published var benchmarkMHz: Double = 0.0
+    @Published var benchmarkFPS: Double = 0.0
+
     // Enable verbose logging for MED3C traps and boot diagnostics
     #if DEBUG
     static let debugLogging = false
@@ -56,7 +63,17 @@ final class EmulatorCore: ObservableObject {
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
         cpu.userdata = selfPtr
 
-        // Set up callbacks
+        // Direct memory access — bypasses read_byte/write_byte callbacks
+        cpu.ram = memory.ram
+        cpu.mapping_regs = (
+            Int32(memory.mappingRegs[0]),
+            Int32(memory.mappingRegs[1]),
+            Int32(memory.mappingRegs[2]),
+            Int32(memory.mappingRegs[3])
+        )
+        cpu.use_direct_memory = true
+
+        // Keep callbacks as fallback (not used in direct memory mode for reads/writes)
         cpu.read_byte = { (userdata, addr) -> UInt8 in
             let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
             return core.memory.readByte(addr)
@@ -107,6 +124,16 @@ final class EmulatorCore: ObservableObject {
         print("Hard disk mounted: \(url.lastPathComponent) (\(data.count / 1024)K)")
     }
 
+    /// Sync CPU's direct-memory mapping registers from MemorySystem
+    func syncMappingRegs() {
+        cpu.mapping_regs = (
+            Int32(memory.mappingRegs[0]),
+            Int32(memory.mappingRegs[1]),
+            Int32(memory.mappingRegs[2]),
+            Int32(memory.mappingRegs[3])
+        )
+    }
+
     private var hasBooted = false
 
     func start() {
@@ -120,6 +147,7 @@ final class EmulatorCore: ObservableObject {
             memory.mappingRegs[1] = 0x0E * 0x4000
             memory.mappingRegs[2] = 0x0E * 0x4000
             memory.mappingRegs[3] = 0x0E * 0x4000
+            syncMappingRegs()
             cpu.pc = 0x8000
             hasBooted = true
         }
@@ -144,32 +172,16 @@ final class EmulatorCore: ObservableObject {
         // Wait for thread to finish
         Thread.sleep(forTimeInterval: 0.05)
 
-        // Re-init CPU but preserve callbacks
+        // Re-init CPU and restore all state
         z80_init(&cpu)
-        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-        cpu.userdata = selfPtr
-        cpu.read_byte = { (userdata, addr) -> UInt8 in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
-            return core.memory.readByte(addr)
-        }
-        cpu.write_byte = { (userdata, addr, value) in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
-            core.memory.writeByte(addr, value)
-        }
-        cpu.port_in = { (z80ptr, port) -> UInt8 in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(z80ptr!.pointee.userdata!).takeUnretainedValue()
-            return core.io.portIn(port)
-        }
-        cpu.port_out = { (z80ptr, port, value) in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(z80ptr!.pointee.userdata!).takeUnretainedValue()
-            core.io.portOut(port, value)
-        }
+        setupCPU()
 
         // Reset memory mappings
         memory.mappingRegs[0] = 8 * 0x4000
         memory.mappingRegs[1] = 9 * 0x4000
         memory.mappingRegs[2] = 0x0E * 0x4000
         memory.mappingRegs[3] = 0 * 0x4000
+        syncMappingRegs()
         memory.blankingFlag = 0
 
         // Clear video RAM (pages 8-9) for clean display on reset
@@ -218,6 +230,22 @@ final class EmulatorCore: ObservableObject {
         var frameCycles: UInt = 0
         var fdcCounter: Int = 0
 
+        // Benchmark: measure cycles/sec and frames/sec over 1-second windows
+        var benchCycleStart = cpu.cyc
+        var benchFrameCount: UInt = 0
+        var benchStartTime = mach_absolute_time()
+        var machTimebaseRatio: Double = 1.0
+        var machTimebaseInverse: Double = 1.0  // ns→mach
+        do {
+            var info = mach_timebase_info_data_t()
+            mach_timebase_info(&info)
+            machTimebaseRatio = Double(info.numer) / Double(info.denom)
+            machTimebaseInverse = Double(info.denom) / Double(info.numer)
+        }
+        // Frame interval in mach absolute time units (16.667ms)
+        let frameIntervalMach = UInt64(16_666_667 * machTimebaseInverse)
+        var nextFrameTime = mach_absolute_time() + frameIntervalMach
+
         while shouldRun {
             // MED3C trap: intercept CALL F33C/F33F when F33C is a RET stub (C9).
             // Once the boot loader patches F33C with C3 (JP to disk's own MED3C),
@@ -226,8 +254,6 @@ final class EmulatorCore: ObservableObject {
             if pc == 0xF33C || pc == 0xF33F {
                 if memory.readByte(0xF33C) == 0xC9 {
                     if !med3cPollingScanned {
-                        // First detection: scan boot loader for polling patterns
-                        // while code is still clean (before any DMA writes)
                         med3cPollingScanned = true
                         scanBootLoaderPolling()
                     }
@@ -240,6 +266,12 @@ final class EmulatorCore: ObservableObject {
             let cycBefore = cpu.cyc
             z80_step(&cpu)
             frameCycles &+= cpu.cyc &- cycBefore
+
+            // Sync mapping registers if changed by I/O port write
+            if mappingRegsDirty {
+                mappingRegsDirty = false
+                syncMappingRegs()
+            }
 
             // Check interrupt flag (set by port callbacks)
             if io.intPending {
@@ -262,9 +294,25 @@ final class EmulatorCore: ObservableObject {
                 }
             }
 
+            // HALT idle: when Z80 is halted, skip to frame boundary
+            // The CPU is waiting for an interrupt (display flag at ~60Hz).
+            // No point burning host CPU on NOP cycles.
+            if cpu.halted && !turboMode {
+                frameCycles = cyclesPerFrame
+            }
+
             // Frame timing
             if frameCycles >= cyclesPerFrame {
                 frameCycles = 0
+
+                // Propagate video dirty flag from C core to Swift (display reads at 60fps)
+                if cpu.video_dirty {
+                    cpu.video_dirty = false
+                    memory.videoDirty = true
+                }
+
+                // Pause audio engine during sustained silence
+                audio.checkSilence()
 
                 // Auto-inject ENTER key for "LOAD SYSTEM" prompt during automated testing
                 if !autoEnterInjected {
@@ -295,8 +343,38 @@ final class EmulatorCore: ObservableObject {
                 }
                 autoEnterDelay += 1
 
+                // Benchmark: report every second
+                benchFrameCount += 1
+                let now = mach_absolute_time()
+                let elapsedNs = Double(now - benchStartTime) * machTimebaseRatio
+                if elapsedNs >= 1_000_000_000 {
+                    let elapsedSec = elapsedNs / 1_000_000_000
+                    let cyclesElapsed = cpu.cyc - benchCycleStart
+                    let mhz = Double(cyclesElapsed) / elapsedSec / 1_000_000
+                    let fps = Double(benchFrameCount) / elapsedSec
+                    DispatchQueue.main.async { [weak self] in
+                        self?.benchmarkMHz = mhz
+                        self?.benchmarkFPS = fps
+                    }
+                    // Write to file for automated collection
+                    let line = String(format: "%.2f MHz, %.1f fps, turbo=%d\n", mhz, fps, turboMode ? 1 : 0)
+                    try? line.write(toFile: "/tmp/northmac_benchmark.txt", atomically: true, encoding: .utf8)
+                    benchCycleStart = cpu.cyc
+                    benchFrameCount = 0
+                    benchStartTime = now
+                }
+
                 if !turboMode {
-                    Thread.sleep(forTimeInterval: 1.0 / 60.0)
+                    let now = mach_absolute_time()
+                    if now < nextFrameTime {
+                        mach_wait_until(nextFrameTime)
+                    }
+                    nextFrameTime += frameIntervalMach
+                    // Prevent drift accumulation if we fell behind
+                    let currentTime = mach_absolute_time()
+                    if nextFrameTime < currentTime {
+                        nextFrameTime = currentTime + frameIntervalMach
+                    }
                 }
             }
         }

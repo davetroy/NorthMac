@@ -12,6 +12,7 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
     private var videoTexture: MTLTexture?
     private var vertexBuffer: MTLBuffer?
     private var texData = [UInt8](repeating: 0, count: 80 * 256)
+    private var lastScrollValue: Int = -1  // force first frame to render
 
     var phosphorIndex: Int = 0
     var bloomAmount: Float = 0.6
@@ -71,13 +72,18 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
         ]
         vertexBuffer = device.makeBuffer(bytes: vertices, length: vertices.count * MemoryLayout<Float>.size)
 
-        // Video RAM texture (80 bytes × 256 lines, R8)
+        // Video RAM texture: stored column-major (80 columns × 256 rows)
+        // Upload directly without CPU transpose; shader swaps coordinates
         let texDesc = MTLTextureDescriptor()
-        texDesc.width = 80
-        texDesc.height = 256
+        texDesc.width = 256   // each column is 256 bytes
+        texDesc.height = 80   // 80 columns
         texDesc.pixelFormat = .r8Unorm
         texDesc.usage = [.shaderRead]
+        #if arch(arm64)
+        texDesc.storageMode = .shared
+        #else
         texDesc.storageMode = .managed
+        #endif
         videoTexture = device.makeTexture(descriptor: texDesc)
     }
 
@@ -93,24 +99,28 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
               let passDesc = currentRenderPassDescriptor,
               let videoTex = videoTexture else { return }
 
-        // Upload video RAM (reuse texData buffer — no allocation)
-        let ram = emulator.memory.ram  // UnsafeMutablePointer — no COW copy
+        // Skip texture upload when display hasn't changed
         let scroll = Int(emulator.io.scanline)
-        if emulator.io.blankDisplay {
-            texData.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
-        } else {
-            for row in 0..<256 {
-                let srcRow = (row + scroll) & 0xFF
-                let rowOff = row * 80
-                for col in 0..<80 {
-                    texData[rowOff + col] = ram[0x20000 + col * 256 + srcRow]
-                }
+        let dirty = emulator.memory.videoDirty || scroll != lastScrollValue
+        if dirty {
+            emulator.memory.videoDirty = false
+            lastScrollValue = scroll
+
+            // Upload video RAM directly — column-major layout matches texture (256×80)
+            // No CPU transpose needed; scroll handled in shader
+            let ram = emulator.memory.ram  // UnsafeMutablePointer — no COW copy
+            if emulator.io.blankDisplay {
+                texData.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
+                videoTex.replace(region: MTLRegionMake2D(0, 0, 256, 80),
+                                 mipmapLevel: 0, withBytes: &texData, bytesPerRow: 256)
+            } else {
+                // Direct memcpy from video RAM (80 columns × 256 bytes each)
+                videoTex.replace(region: MTLRegionMake2D(0, 0, 256, 80),
+                                 mipmapLevel: 0, withBytes: ram + 0x20000, bytesPerRow: 256)
             }
         }
-        videoTex.replace(region: MTLRegionMake2D(0, 0, 80, 256),
-                         mipmapLevel: 0, withBytes: &texData, bytesPerRow: 80)
 
-        // Render
+        // Render (always — drawable must be presented even if texture unchanged)
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDesc) else { return }
         encoder.setRenderPipelineState(pipeline)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
@@ -124,7 +134,8 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
             scanline: scanlineAmount,
             curvature: curvatureAmount,
             screenGlow: screenGlowAmount,
-            visibleLines: 240
+            visibleLines: 240,
+            scrollOffset: Float(scroll) / 256.0
         )
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<CRTUniforms>.size, index: 0)
 
@@ -175,7 +186,8 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
             phosphorB: phosphorColors[phosphorIndex].2,
             bloom: bloomAmount, scanline: scanlineAmount,
             curvature: curvatureAmount, screenGlow: screenGlowAmount,
-            visibleLines: 240
+            visibleLines: 240,
+            scrollOffset: Float(emulator?.io.scanline ?? 0) / 256.0
         )
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<CRTUniforms>.size, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
@@ -261,18 +273,28 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
         float phosphorR;
         float phosphorG;
         float phosphorB;
-        float bloom;       // 0=none, 1=heavy glow
-        float scanline;    // 0=none, 1=strong lines
-        float curvature;   // 0=flat, 1=curved
-        float screenGlow;  // 0=none, 1=strong ambient CRT glow
+        float bloom;         // 0=none, 1=heavy glow
+        float scanline;      // 0=none, 1=strong lines
+        float curvature;     // 0=flat, 1=curved
+        float screenGlow;    // 0=none, 1=strong ambient CRT glow
         float visibleLines;
+        float scrollOffset;  // scanline scroll as fraction of 256
     };
 
-    float decodePixel(texture2d<float> tex, sampler s, float2 uv) {
-        float byteVal = tex.sample(s, uv).r;
+    // Texture is 256×80 column-major: X=scanline, Y=column byte
+    // Screen coords: screenX (0-1 = 640 pixels), screenY (0-1 = visibleLines scanlines)
+    float decodePixel(texture2d<float> tex, sampler s,
+                      float screenX, float screenY, float scrollOffset) {
+        // Column byte position (0-79)
+        float colByte = screenX * 80.0;
+        // Bit within byte
+        int bitIndex = 7 - (int(screenX * 640.0) % 8);
+        // Scanline with scroll (wraps at 256)
+        float row = fract(screenY + scrollOffset);
+        // Sample: X axis = scanline (row/256), Y axis = column (colByte/80)
+        float2 texUV = float2(row, colByte / 80.0);
+        float byteVal = tex.sample(s, texUV).r;
         int byteInt = int(byteVal * 255.0 + 0.5);
-        float colFloat = uv.x * 80.0;
-        int bitIndex = 7 - (int(colFloat * 8.0) % 8);
         return float((byteInt >> bitIndex) & 1);
     }
 
@@ -302,24 +324,25 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
 
         // Scale to visible lines
         float visFrac = u.visibleLines / 256.0;
-        float2 texUV = float2(uv.x, uv.y * visFrac);
+        float screenX = uv.x;
+        float screenY = uv.y * visFrac;
 
         // Decode current pixel
-        float pixel = decodePixel(videoTex, nearest, texUV);
+        float pixel = decodePixel(videoTex, nearest, screenX, screenY, u.scrollOffset);
 
         // Bloom: 4 cardinal + 4 diagonal neighbors
         float bloomVal = 0.0;
         if (u.bloom > 0.01) {
             float bw = 1.0 / 640.0;
             float bh = 1.0 / u.visibleLines;
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(-bw, 0));
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(bw, 0));
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(0, -bh));
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(0, bh));
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(-bw, -bh)) * 0.7;
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(bw, -bh)) * 0.7;
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(-bw, bh)) * 0.7;
-            bloomVal += decodePixel(videoTex, nearest, texUV + float2(bw, bh)) * 0.7;
+            bloomVal += decodePixel(videoTex, nearest, screenX - bw, screenY, u.scrollOffset);
+            bloomVal += decodePixel(videoTex, nearest, screenX + bw, screenY, u.scrollOffset);
+            bloomVal += decodePixel(videoTex, nearest, screenX, screenY - bh, u.scrollOffset);
+            bloomVal += decodePixel(videoTex, nearest, screenX, screenY + bh, u.scrollOffset);
+            bloomVal += decodePixel(videoTex, nearest, screenX - bw, screenY - bh, u.scrollOffset) * 0.7;
+            bloomVal += decodePixel(videoTex, nearest, screenX + bw, screenY - bh, u.scrollOffset) * 0.7;
+            bloomVal += decodePixel(videoTex, nearest, screenX - bw, screenY + bh, u.scrollOffset) * 0.7;
+            bloomVal += decodePixel(videoTex, nearest, screenX + bw, screenY + bh, u.scrollOffset) * 0.7;
             bloomVal /= 6.8;
             pixel = min(pixel + bloomVal * u.bloom * 1.5, 1.0);
         }
@@ -359,6 +382,7 @@ struct CRTUniforms {
     var curvature: Float
     var screenGlow: Float
     var visibleLines: Float
+    var scrollOffset: Float
 }
 
 /// SwiftUI wrapper
