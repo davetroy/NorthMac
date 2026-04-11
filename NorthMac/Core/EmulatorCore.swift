@@ -23,6 +23,10 @@ final class EmulatorCore: ObservableObject {
     private var instructionCount: Int = 0
     private let floppyPulse = 0x22  // 34 instructions between FDC advances
 
+    // Performance benchmark: published so UI can display
+    @Published var benchmarkMHz: Double = 0.0
+    @Published var benchmarkFPS: Double = 0.0
+
     // Enable verbose logging for MED3C traps and boot diagnostics
     #if DEBUG
     static let debugLogging = false
@@ -218,6 +222,17 @@ final class EmulatorCore: ObservableObject {
         var frameCycles: UInt = 0
         var fdcCounter: Int = 0
 
+        // Benchmark: measure cycles/sec and frames/sec over 1-second windows
+        var benchCycleStart = cpu.cyc
+        var benchFrameCount: UInt = 0
+        var benchStartTime = mach_absolute_time()
+        var machTimebaseRatio: Double = 1.0
+        do {
+            var info = mach_timebase_info_data_t()
+            mach_timebase_info(&info)
+            machTimebaseRatio = Double(info.numer) / Double(info.denom)
+        }
+
         while shouldRun {
             // MED3C trap: intercept CALL F33C/F33F when F33C is a RET stub (C9).
             // Once the boot loader patches F33C with C3 (JP to disk's own MED3C),
@@ -294,6 +309,27 @@ final class EmulatorCore: ObservableObject {
                     writeBootStatus()
                 }
                 autoEnterDelay += 1
+
+                // Benchmark: report every second
+                benchFrameCount += 1
+                let now = mach_absolute_time()
+                let elapsedNs = Double(now - benchStartTime) * machTimebaseRatio
+                if elapsedNs >= 1_000_000_000 {
+                    let elapsedSec = elapsedNs / 1_000_000_000
+                    let cyclesElapsed = cpu.cyc - benchCycleStart
+                    let mhz = Double(cyclesElapsed) / elapsedSec / 1_000_000
+                    let fps = Double(benchFrameCount) / elapsedSec
+                    DispatchQueue.main.async { [weak self] in
+                        self?.benchmarkMHz = mhz
+                        self?.benchmarkFPS = fps
+                    }
+                    // Write to file for automated collection
+                    let line = String(format: "%.2f MHz, %.1f fps, turbo=%d\n", mhz, fps, turboMode ? 1 : 0)
+                    try? line.write(toFile: "/tmp/northmac_benchmark.txt", atomically: true, encoding: .utf8)
+                    benchCycleStart = cpu.cyc
+                    benchFrameCount = 0
+                    benchStartTime = now
+                }
 
                 if !turboMode {
                     Thread.sleep(forTimeInterval: 1.0 / 60.0)

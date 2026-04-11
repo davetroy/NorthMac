@@ -222,6 +222,13 @@ struct ContentView: View {
                 .controlSize(.small)
 
             Spacer()
+
+            // Performance benchmark display
+            if emulator.benchmarkMHz > 0 {
+                Text(String(format: "%.1f MHz  %.0f fps", emulator.benchmarkMHz, emulator.benchmarkFPS))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
