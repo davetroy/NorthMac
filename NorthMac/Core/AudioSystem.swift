@@ -38,8 +38,7 @@ final class AudioSystem {
 
     // Engine pause/resume for silence detection
     private var engineRunning = true
-    private var silentFrames: Int = 0
-    private let silencePauseThreshold: Int = 44100  // ~1 second of silence before pausing
+    private var lastAudioActivity: UInt64 = mach_absolute_time()
 
     init() {
         setupAudioEngine()
@@ -74,10 +73,10 @@ final class AudioSystem {
 
                     // Fixed-frequency beep (port 0x83 IN)
                     if beepLeft > 0 {
-                        let raw = sin(beepPhase) > 0 ? Float(0.35) : Float(-0.35)
+                        let raw = sin(beepPhase) > 0 ? Float(0.6) : Float(-0.6)
                         // Envelope: fade in/out over 100 samples
                         let env: Float
-                        let totalBeep = Int(self.sampleRate * 0.15)
+                        let totalBeep = Int(self.sampleRate * 0.25)
                         let pos = totalBeep - beepLeft
                         if pos < 100 {
                             env = Float(pos) / 100.0
@@ -114,7 +113,7 @@ final class AudioSystem {
 
         engine.attach(source)
         engine.connect(source, to: engine.mainMixerNode, format: format)
-        engine.mainMixerNode.outputVolume = 0.3
+        engine.mainMixerNode.outputVolume = 0.7
 
         do {
             try engine.start()
@@ -129,8 +128,9 @@ final class AudioSystem {
     func beep() {
         ensureEngineRunning()
         lock.lock()
-        beepSamplesRemaining = Int(sampleRate * 0.15)  // 150ms beep
+        beepSamplesRemaining = Int(sampleRate * 0.25)  // 250ms beep
         beepPhase = 0.0
+        lastAudioActivity = mach_absolute_time()
         lock.unlock()
     }
 
@@ -151,6 +151,7 @@ final class AudioSystem {
             lastToggleSample = now
             samplesSinceLastToggle = 0
             speakerToggleActive = true
+            lastAudioActivity = mach_absolute_time()
 
             // Resume engine if it was paused for silence
             if !engineRunning {
@@ -175,22 +176,25 @@ final class AudioSystem {
         }
     }
 
-    /// Called periodically from the emulator to pause engine during sustained silence
+    /// Called periodically from the emulator to pause engine during sustained silence.
+    /// Uses wall-clock time (not frame count) so turbo mode doesn't cause premature pausing.
     func checkSilence() {
         lock.lock()
         let isSilent = beepSamplesRemaining <= 0 &&
                         samplesSinceLastToggle > decayThreshold
+        let lastActivity = lastAudioActivity
         lock.unlock()
 
         if isSilent && engineRunning {
-            silentFrames += 1
-            if silentFrames > 60 {  // ~1 second at 60fps
+            // Check wall-clock time since last audio activity
+            let now = mach_absolute_time()
+            var info = mach_timebase_info_data_t()
+            mach_timebase_info(&info)
+            let elapsedNs = Double(now - lastActivity) * Double(info.numer) / Double(info.denom)
+            if elapsedNs > 2_000_000_000 {  // 2 seconds of real silence
                 audioEngine?.pause()
                 engineRunning = false
-                silentFrames = 0
             }
-        } else {
-            silentFrames = 0
         }
     }
 
