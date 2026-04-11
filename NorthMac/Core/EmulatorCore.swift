@@ -235,11 +235,16 @@ final class EmulatorCore: ObservableObject {
         var benchFrameCount: UInt = 0
         var benchStartTime = mach_absolute_time()
         var machTimebaseRatio: Double = 1.0
+        var machTimebaseInverse: Double = 1.0  // ns→mach
         do {
             var info = mach_timebase_info_data_t()
             mach_timebase_info(&info)
             machTimebaseRatio = Double(info.numer) / Double(info.denom)
+            machTimebaseInverse = Double(info.denom) / Double(info.numer)
         }
+        // Frame interval in mach absolute time units (16.667ms)
+        let frameIntervalMach = UInt64(16_666_667 * machTimebaseInverse)
+        var nextFrameTime = mach_absolute_time() + frameIntervalMach
 
         while shouldRun {
             // MED3C trap: intercept CALL F33C/F33F when F33C is a RET stub (C9).
@@ -357,7 +362,16 @@ final class EmulatorCore: ObservableObject {
                 }
 
                 if !turboMode {
-                    Thread.sleep(forTimeInterval: 1.0 / 60.0)
+                    let now = mach_absolute_time()
+                    if now < nextFrameTime {
+                        mach_wait_until(nextFrameTime)
+                    }
+                    nextFrameTime += frameIntervalMach
+                    // Prevent drift accumulation if we fell behind
+                    let currentTime = mach_absolute_time()
+                    if nextFrameTime < currentTime {
+                        nextFrameTime = currentTime + frameIntervalMach
+                    }
                 }
             }
         }
