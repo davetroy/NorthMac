@@ -249,8 +249,6 @@ final class EmulatorCore: ObservableObject {
             if pc == 0xF33C || pc == 0xF33F {
                 if memory.readByte(0xF33C) == 0xC9 {
                     if !med3cPollingScanned {
-                        // First detection: scan boot loader for polling patterns
-                        // while code is still clean (before any DMA writes)
                         med3cPollingScanned = true
                         scanBootLoaderPolling()
                     }

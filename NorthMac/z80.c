@@ -790,6 +790,23 @@ void z80_step(z80* const z) {
   process_interrupts(z);
 }
 
+// executes instructions until max_cycles consumed; returns cycles actually consumed
+unsigned long z80_run(z80* const z, unsigned long max_cycles) {
+  unsigned long start = z->cyc;
+  unsigned long target = start + max_cycles;
+  while (z->cyc < target) {
+    if (z->halted) {
+      // Skip remaining cycles — caller handles HALT wake-up
+      z->cyc = target;
+      break;
+    }
+    const uint8_t opcode = nextb(z);
+    exec_opcode(z, opcode);
+    process_interrupts(z);
+  }
+  return z->cyc - start;
+}
+
 // outputs to stdout a debug trace of the emulator
 void z80_debug_output(z80* const z) {
   printf("PC: %04X, AF: %04X, BC: %04X, DE: %04X, HL: %04X, SP: %04X, "
