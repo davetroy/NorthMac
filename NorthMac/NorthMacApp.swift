@@ -14,6 +14,18 @@ struct NorthMacApp: App {
             ContentView()
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About NorthMac") {
+                    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+                    NSApplication.shared.orderFrontStandardAboutPanel(options: [
+                        .applicationName: "NorthMac",
+                        .applicationVersion: "\(version) (build \(BuildInfo.buildNumber))",
+                        .version: "\(BuildInfo.gitHash)",
+                        .credits: NSAttributedString(string: "NorthStar Advantage Emulator"),
+                    ])
+                }
+            }
+
             // Add disk mount items after the default New Window (Cmd+N)
             CommandGroup(after: .newItem) {
                 Divider()

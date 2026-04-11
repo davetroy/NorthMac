@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000190000000000000019 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000019 /* BuildInfo.swift */; };
 		A10000010000000000000001 /* NorthMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* NorthMacApp.swift */; };
 		A10000020000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000020000000000000002 /* ContentView.swift */; };
 		A10000030000000000000003 /* EmulatorCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000030000000000000003 /* EmulatorCore.swift */; };
@@ -17,6 +18,7 @@
 		A10000080000000000000008 /* KeyboardSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000080000000000000008 /* KeyboardSystem.swift */; };
 		A100000F0000000000000042 /* MetalDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000F0000000000000042 /* MetalDisplayView.swift */; };
 		A10000100000000000000010 /* DiskImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000100000000000000010 /* DiskImage.swift */; };
+		A10000100000000000000020 /* ResourceCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000100000000000000020 /* ResourceCache.swift */; };
 		A10000110000000000000011 /* z80.c in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000011 /* z80.c */; };
 
 		A10000160000000000000016 /* AudioSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000160000000000000016 /* AudioSystem.swift */; };
@@ -25,6 +27,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A20000190000000000000019 /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		A20000010000000000000001 /* NorthMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NorthMacApp.swift; sourceTree = "<group>"; };
 		A20000020000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A20000030000000000000003 /* EmulatorCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmulatorCore.swift; sourceTree = "<group>"; };
@@ -35,6 +38,7 @@
 		A20000080000000000000008 /* KeyboardSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardSystem.swift; sourceTree = "<group>"; };
 		A200000F0000000000000042 /* MetalDisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalDisplayView.swift; sourceTree = "<group>"; };
 		A20000100000000000000010 /* DiskImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskImage.swift; sourceTree = "<group>"; };
+		A20000100000000000000020 /* ResourceCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceCache.swift; sourceTree = "<group>"; };
 		A20000110000000000000011 /* z80.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = z80.c; sourceTree = "<group>"; };
 
 		A20000130000000000000013 /* z80.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = z80.h; sourceTree = "<group>"; };
@@ -68,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000010000000000000001 /* NorthMacApp.swift */,
+				A20000190000000000000019 /* BuildInfo.swift */,
 				A20000020000000000000002 /* ContentView.swift */,
 				A20000110000000000000011 /* z80.c */,
 				A20000130000000000000013 /* z80.h */,
@@ -116,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000100000000000000010 /* DiskImage.swift */,
+				A20000100000000000000020 /* ResourceCache.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -205,6 +211,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000001 /* NorthMacApp.swift in Sources */,
+				A10000190000000000000019 /* BuildInfo.swift in Sources */,
 				A10000020000000000000002 /* ContentView.swift in Sources */,
 				A10000030000000000000003 /* EmulatorCore.swift in Sources */,
 				A10000040000000000000004 /* MemorySystem.swift in Sources */,
@@ -214,6 +221,7 @@
 				A10000080000000000000008 /* KeyboardSystem.swift in Sources */,
 				A100000F0000000000000042 /* MetalDisplayView.swift in Sources */,
 				A10000100000000000000010 /* DiskImage.swift in Sources */,
+				A10000100000000000000020 /* ResourceCache.swift in Sources */,
 				A10000110000000000000011 /* z80.c in Sources */,
 				A10000160000000000000016 /* AudioSystem.swift in Sources */,
 				A10000170000000000000017 /* HardDiskController.swift in Sources */,

@@ -13,5 +13,8 @@ DerivedData/
 # Claude Code project instructions
 CLAUDE.md
 
+# Generated build info
+NorthMac/BuildInfo.swift
+
 # Built application
 *.app

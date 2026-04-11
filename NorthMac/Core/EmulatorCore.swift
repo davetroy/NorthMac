@@ -79,37 +79,13 @@ final class EmulatorCore: ObservableObject {
         }
     }
 
-    /// Loads boot ROM from bundle or Application Support. Returns true on success.
+    /// Loads boot ROM from the shared cache into this instance's memory.
     @discardableResult
     func loadBootROM() -> Bool {
-        // Try bundle first, then file system
-        var romData: Data?
-
-        if let bundleURL = Bundle.main.url(forResource: "AdvantageBootRom", withExtension: "bin") {
-            romData = try? Data(contentsOf: bundleURL)
-        }
-
-        if romData == nil {
-            // Try user's Application Support directory
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            if let romURL = appSupport?.appendingPathComponent("NorthMac/AdvantageBootRom.bin") {
-                romData = try? Data(contentsOf: romURL)
-            }
-        }
-
-        if romData == nil {
-            // Try project root (for development builds)
-            let romURL = Self.projectRoot.appendingPathComponent("Resources/AdvantageBootRom.bin")
-            romData = try? Data(contentsOf: romURL)
-        }
-
-        guard let data = romData else {
-            print("ERROR: Could not load boot ROM")
+        guard let romBytes = ResourceCache.shared.bootROMData else {
             return false
         }
-
-        memory.loadBootROM(data: Array(data))
-        print("Boot ROM loaded: \(data.count) bytes")
+        memory.loadBootROM(data: romBytes)
         return true
     }
 

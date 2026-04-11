@@ -73,53 +73,51 @@ struct ContentView: View {
             Text(setupWarning ?? "")
         }
         .onAppear {
-            // Load boot ROM and scan disks concurrently on a background queue
-            // to avoid blocking the window from appearing.
-            let emulator = self.emulator
-            DispatchQueue.global(qos: .userInitiated).async {
+            // Use shared cache — first window triggers the load, subsequent windows
+            // get cached results instantly with no I/O.
+            ResourceCache.shared.ensureLoaded { [self] in
+                let cache = ResourceCache.shared
                 let romLoaded = emulator.loadBootROM()
 
-                // scanForDisks is a mutating method on self — call the static helper
-                let (disks, hds) = Self.scanForDisksAsync()
+                availableDisks = cache.availableDisks
+                availableHDs = cache.availableHDs
 
                 let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
                 let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
                 let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
 
-                let disk1 = disks.first(where: { $0.name == lastDisk1 })
-                    ?? disks.first(where: { $0.name == "advf2_cpm120_wm" })
-                    ?? disks.first(where: { $0.validation.isValid })
-                let disk2 = lastDisk2.isEmpty ? nil : disks.first(where: { $0.name == lastDisk2 })
-                let hd = lastHD.isEmpty ? nil : hds.first(where: { $0.name == lastHD })
-
-                if let disk1 = disk1 { emulator.mountDisk(url: disk1.url, drive: 0) }
-                if let disk2 = disk2 { emulator.mountDisk(url: disk2.url, drive: 1) }
-                if let hd = hd { emulator.mountHardDisk(url: hd.url) }
-
-                DispatchQueue.main.async {
-                    self.availableDisks = disks
-                    self.availableHDs = hds
-                    if let disk1 = disk1 { self.selectedDisk1 = disk1 }
-                    if let disk2 = disk2 { self.selectedDisk2 = disk2 }
-                    if let hd = hd { self.selectedHD = hd }
-
-                    // Notify user about missing resources
-                    var missing: [String] = []
-                    if !romLoaded {
-                        missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
-                    }
-                    if disks.isEmpty {
-                        missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
-                    }
-                    if !missing.isEmpty {
-                        self.setupWarning = "The following resources are missing:\n\n"
-                            + missing.joined(separator: "\n")
-                            + "\n\nSee README.md for details on where to find these files."
-                        self.showSetupWarning = true
-                    }
-
-                    emulator.start()
+                let disk1 = availableDisks.first(where: { $0.name == lastDisk1 })
+                    ?? availableDisks.first(where: { $0.name == "advf2_cpm120_wm" })
+                    ?? availableDisks.first(where: { $0.validation.isValid })
+                if let disk1 = disk1 {
+                    selectedDisk1 = disk1
+                    emulator.mountDisk(url: disk1.url, drive: 0)
                 }
+                if !lastDisk2.isEmpty, let disk2 = availableDisks.first(where: { $0.name == lastDisk2 }) {
+                    selectedDisk2 = disk2
+                    emulator.mountDisk(url: disk2.url, drive: 1)
+                }
+                if !lastHD.isEmpty, let hd = availableHDs.first(where: { $0.name == lastHD }) {
+                    selectedHD = hd
+                    emulator.mountHardDisk(url: hd.url)
+                }
+
+                // Notify user about missing resources
+                var missing: [String] = []
+                if !romLoaded {
+                    missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
+                }
+                if availableDisks.isEmpty {
+                    missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
+                }
+                if !missing.isEmpty {
+                    setupWarning = "The following resources are missing:\n\n"
+                        + missing.joined(separator: "\n")
+                        + "\n\nSee README.md for details on where to find these files."
+                    showSetupWarning = true
+                }
+
+                emulator.start()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .toggleTurbo)) { _ in
@@ -244,66 +242,7 @@ struct ContentView: View {
         emulator.mountDisk(url: disk.url, drive: drive)
     }
 
-    /// Scan for disk images on a background thread. Returns (floppies, hard disks).
-    private static func scanForDisksAsync() -> ([DiskEntry], [DiskEntry]) {
-        let fm = FileManager.default
-        var disks: [DiskEntry] = []
-
-        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        let diskImagesDirs = [
-            Bundle.main.resourceURL?.appendingPathComponent("Disk Images").path,
-            appSupport?.appendingPathComponent("NorthMac/Disk Images").path,
-            EmulatorCore.projectRoot.appendingPathComponent("Disk Images").path
-        ].compactMap { $0 }
-
-        let categories = ["Bootable", "Non-Bootable", "Unknown"]
-
-        for base in diskImagesDirs {
-            for category in categories {
-                let dir = (base as NSString).appendingPathComponent(category)
-                guard let items = try? fm.contentsOfDirectory(atPath: dir) else { continue }
-                for item in items.sorted() where item.uppercased().hasSuffix(".NSI") {
-                    let full = (dir as NSString).appendingPathComponent(item)
-                    let name = (item as NSString).deletingPathExtension
-                    guard !disks.contains(where: { $0.name == name }) else { continue }
-                    let url = URL(fileURLWithPath: full)
-                    let validation = DiskImage.quickValidate(url: url)
-                    disks.append(DiskEntry(id: full, name: name, url: url,
-                                           category: category, validation: validation))
-                }
-            }
-        }
-
-        var hds: [DiskEntry] = []
-        let hdDirs = [
-            Bundle.main.resourceURL?.appendingPathComponent("Hard Disks").path,
-            appSupport?.appendingPathComponent("NorthMac/Hard Disks").path,
-            EmulatorCore.projectRoot.appendingPathComponent("Hard Disks").path
-        ].compactMap { $0 }
-        for dir in hdDirs {
-            guard let items = try? fm.contentsOfDirectory(atPath: dir) else { continue }
-            for item in items.sorted() where item.uppercased().hasSuffix(".NHD") {
-                let name = (item as NSString).deletingPathExtension
-                guard !hds.contains(where: { $0.name == name }) else { continue }
-                let full = (dir as NSString).appendingPathComponent(item)
-                let url = URL(fileURLWithPath: full)
-                let valid: Bool
-                if let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-                   data.count >= 128, data[0] == 0x00, data[1] == 0xFF {
-                    valid = true
-                } else {
-                    valid = false
-                }
-                let validation = DiskImage.ValidationResult(
-                    isValid: valid, isBootable: valid, format: nil,
-                    platform: .advantage, hasMED3C: false,
-                    warnings: valid ? [] : ["Invalid NHD file"])
-                hds.append(DiskEntry(id: full, name: name, url: url,
-                                     category: "Hard Disk", validation: validation))
-            }
-        }
-        return (disks, hds)
-    }
+    // Disk scanning is handled by ResourceCache.shared
 
     private func takeScreenshot() {
         guard let window = NSApplication.shared.mainWindow,
