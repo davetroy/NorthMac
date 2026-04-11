@@ -2,7 +2,7 @@ import Foundation
 
 /// I/O port dispatch and control registers for the NorthStar Advantage
 final class IOSystem {
-    weak var emulator: EmulatorCore?
+    unowned var emulator: EmulatorCore!
 
     // I/O control register
     var ioControlReg: Int = 0
@@ -43,8 +43,8 @@ final class IOSystem {
         switch pHi {
         case 0x00:
             // Slot 6 — Hard Disk Controller
-            if let hdc = emulator?.hdc, hdc.mounted {
-                return hdc.hdcIn(port: pLo)
+            if emulator.hdc.mounted {
+                return emulator.hdc.hdcIn(port: pLo)
             }
             return 0xFF
 
@@ -62,7 +62,7 @@ final class IOSystem {
 
         case 0x08:
             // FDC inputs
-            return emulator?.fdc.fdcIn(portLo: pLo) ?? 0xFF
+            return emulator.fdc.fdcIn(portLo: pLo) ?? 0xFF
 
         case 0x09:
             // Scan register - output only
@@ -106,8 +106,8 @@ final class IOSystem {
         switch pHi {
         case 0x00:
             // Slot 6 — Hard Disk Controller
-            if let hdc = emulator?.hdc, hdc.mounted {
-                hdc.hdcOut(port: pLo, data: data)
+            if emulator.hdc.mounted {
+                emulator.hdc.hdcOut(port: pLo, data: data)
             }
 
         case 0x01...0x05:
@@ -125,7 +125,7 @@ final class IOSystem {
 
         case 0x08:
             // FDC outputs
-            emulator?.fdc.fdcOut(portLo: pLo, data: data)
+            emulator.fdc.fdcOut(portLo: pLo, data: data)
 
         case 0x09:
             // Scan register
@@ -133,8 +133,8 @@ final class IOSystem {
 
         case 0x0A:
             // Memory mapping registers
-            emulator?.memory.mapRegisterWrite(reg: Int(pLo), data: data)
-            emulator?.mappingRegsDirty = true
+            emulator.memory.mapRegisterWrite(reg: Int(pLo), data: data)
+            emulator.mappingRegsDirty = true
 
         case 0x0B:
             // Clear display flag (allows next pulse to generate INT)
@@ -168,7 +168,7 @@ final class IOSystem {
         let id = Int(slot & 0x07)
         // Only report HDC if a hard disk is mounted
         if id == 0 {
-            return (emulator?.hdc.mounted ?? false) ? 0xBF : 0xFF
+            return (emulator.hdc.mounted ?? false) ? 0xBF : 0xFF
         }
         return slotMap[id] ?? 0xFF
     }
@@ -185,7 +185,7 @@ final class IOSystem {
         case 4: break // Cursor Lock
         case 5:
             // Start disk drive motors
-            emulator?.fdc.floppy.motorOn = true
+            emulator.fdc.floppy.motorOn = true
         case 6:
             prefixToggle = true
         case 7:
@@ -199,23 +199,22 @@ final class IOSystem {
         }
 
         // Acquire mode (bit 3)
-        if let fdc = emulator?.fdc {
-            if ioCtl & 0x08 != 0 {
-                var f = fdc.floppy
-                f.acquireMode = true
-                if !f.acquireModePrev {
-                    fdc.floppy = f
-                    fdc.startSectorRead()
-                    f = fdc.floppy
-                }
-                f.acquireModePrev = f.acquireMode
+        let fdc = emulator.fdc
+        if ioCtl & 0x08 != 0 {
+            var f = fdc.floppy
+            f.acquireMode = true
+            if !f.acquireModePrev {
                 fdc.floppy = f
-            } else {
-                var f = fdc.floppy
-                f.acquireMode = false
-                f.acquireModePrev = f.acquireMode
-                fdc.floppy = f
+                fdc.startSectorRead()
+                f = fdc.floppy
             }
+            f.acquireModePrev = f.acquireMode
+            fdc.floppy = f
+        } else {
+            var f = fdc.floppy
+            f.acquireMode = false
+            f.acquireModePrev = f.acquireMode
+            fdc.floppy = f
         }
 
         // Bit 4: I/O reset
@@ -223,17 +222,17 @@ final class IOSystem {
         blankDisplay = (ioCtl & 0x20) != 0
 
         // Bit 6: Speaker data — toggling generates tones
-        emulator?.audio.speakerToggle(high: (ioCtl & 0x40) != 0)
+        emulator.audio.speakerToggle(high: (ioCtl & 0x40) != 0)
 
         // Bit 7: Enable display interrupt
         displayInterruptEnabled = (ioCtl & 0x80) != 0
 
         // Set cmd_ack_counter
-        emulator?.fdc.cmdAckCounter = 3
+        emulator.fdc.cmdAckCounter = 3
     }
 
     func getStatusReg1() -> UInt8 {
-        guard let fdc = emulator?.fdc else { return 0xFF }
+        let fdc = emulator.fdc
 
         // Advance FDC state machine
         fdc.floppyState()
@@ -293,7 +292,7 @@ final class IOSystem {
     }
 
     func getStatusReg2() -> UInt8 {
-        guard let fdc = emulator?.fdc else { return 0xFF }
+        let fdc = emulator.fdc
 
         // Advance FDC state machine
         fdc.floppyState()
