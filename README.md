@@ -24,7 +24,7 @@ NorthMac emulates the NorthStar Advantage Z80-based microcomputer — an all-in-
 - **Hard disk controller** supporting NHD images
 - **Keyboard input** via macOS key events mapped to NorthStar scan codes
 - **Audio** with programmable speaker emulation
-- **Turbo mode** (Cmd+T) for maximum speed
+- **Turbo mode** (Cmd+T) for maximum speed — nearly **200x faster** than original hardware
 - **Screenshots** (Cmd+S) saved to your preferred location
 
 ### What Boots
@@ -51,6 +51,12 @@ Disk images (`.NSI`, `.NHD`) and the boot ROM (`AdvantageBootRom.bin`) are **not
 - Place hard disk images in `Hard Disks/`
 
 These can be found in various vintage computing archives and preservation sites. A good collection of NorthStar Advantage disk images is available from [Dave Dunfield's classiccmp archive](http://dunfield.classiccmp.org/img42841/d/nsadvan.zip). Boot ROMs, documentation, and additional resources are available from [djones60/NorthStar-Advantage](https://github.com/djones60/NorthStar-Advantage).
+
+## Performance
+
+The original NorthStar Advantage ran a Z80A at 4 MHz. On Apple Silicon, NorthMac's turbo mode reaches approximately **780 MHz** of emulated Z80 throughput — roughly **195x the speed of the original hardware**. At normal speed, the emulator idles at under 5% CPU usage thanks to HALT detection and frame-skip optimizations.
+
+Key optimizations: direct memory access from the C core (bypassing Swift callbacks), a tight C run loop (`emulator_run_frame`) that only calls back to Swift every 34 instructions for FDC timing, GPU-side video RAM transpose, and LDIR/LDDR block-transfer fast paths.
 
 ## Keyboard Shortcuts
 
