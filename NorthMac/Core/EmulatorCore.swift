@@ -268,6 +268,12 @@ final class EmulatorCore: ObservableObject {
                 syncMappingRegs()
             }
 
+            // Propagate video dirty flag from C core to Swift
+            if cpu.video_dirty {
+                cpu.video_dirty = false
+                memory.videoDirty = true
+            }
+
             // Check interrupt flag (set by port callbacks)
             if io.intPending {
                 io.intPending = false

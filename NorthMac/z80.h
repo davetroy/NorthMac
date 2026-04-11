@@ -17,6 +17,7 @@ struct z80 {
   uint8_t* ram;             // pointer to 256KB physical RAM
   int mapping_regs[4];      // maps logical 16KB pages to physical byte offsets
   bool use_direct_memory;   // enable direct memory access mode
+  bool video_dirty;         // set when video RAM (0x20000-0x27FFF) is written
 
   unsigned long cyc; // cycle count (t-states)
 

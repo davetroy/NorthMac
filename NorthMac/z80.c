@@ -57,8 +57,11 @@ static inline void wb(z80* const z, uint16_t addr, uint8_t val) {
     int phys = z->mapping_regs[addr >> 14] + (addr & 0x3FFF);
     // Pages 0-3 (0x00000-0x0FFFF): main RAM — writable
     // Pages 8-9 (0x20000-0x27FFF): video RAM — writable
-    if (phys < 0x10000 || (phys >= 0x20000 && phys < 0x28000)) {
+    if (phys < 0x10000) {
       z->ram[phys] = val;
+    } else if (phys >= 0x20000 && phys < 0x28000) {
+      z->ram[phys] = val;
+      z->video_dirty = true;
     }
     return;
   }
@@ -775,6 +778,7 @@ void z80_init(z80* const z) {
 
   z->ram = NULL;
   z->use_direct_memory = false;
+  z->video_dirty = false;
   for (int i = 0; i < 4; i++) z->mapping_regs[i] = 0;
 }
 

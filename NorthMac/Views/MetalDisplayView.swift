@@ -12,6 +12,7 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
     private var videoTexture: MTLTexture?
     private var vertexBuffer: MTLBuffer?
     private var texData = [UInt8](repeating: 0, count: 80 * 256)
+    private var lastScrollValue: Int = -1  // force first frame to render
 
     var phosphorIndex: Int = 0
     var bloomAmount: Float = 0.6
@@ -93,24 +94,31 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
               let passDesc = currentRenderPassDescriptor,
               let videoTex = videoTexture else { return }
 
-        // Upload video RAM (reuse texData buffer — no allocation)
-        let ram = emulator.memory.ram  // UnsafeMutablePointer — no COW copy
+        // Skip texture upload when display hasn't changed
         let scroll = Int(emulator.io.scanline)
-        if emulator.io.blankDisplay {
-            texData.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
-        } else {
-            for row in 0..<256 {
-                let srcRow = (row + scroll) & 0xFF
-                let rowOff = row * 80
-                for col in 0..<80 {
-                    texData[rowOff + col] = ram[0x20000 + col * 256 + srcRow]
+        let dirty = emulator.memory.videoDirty || scroll != lastScrollValue
+        if dirty {
+            emulator.memory.videoDirty = false  // reset both flags
+            lastScrollValue = scroll
+
+            // Upload video RAM (reuse texData buffer — no allocation)
+            let ram = emulator.memory.ram  // UnsafeMutablePointer — no COW copy
+            if emulator.io.blankDisplay {
+                texData.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
+            } else {
+                for row in 0..<256 {
+                    let srcRow = (row + scroll) & 0xFF
+                    let rowOff = row * 80
+                    for col in 0..<80 {
+                        texData[rowOff + col] = ram[0x20000 + col * 256 + srcRow]
+                    }
                 }
             }
+            videoTex.replace(region: MTLRegionMake2D(0, 0, 80, 256),
+                             mipmapLevel: 0, withBytes: &texData, bytesPerRow: 80)
         }
-        videoTex.replace(region: MTLRegionMake2D(0, 0, 80, 256),
-                         mipmapLevel: 0, withBytes: &texData, bytesPerRow: 80)
 
-        // Render
+        // Render (always — drawable must be presented even if texture unchanged)
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDesc) else { return }
         encoder.setRenderPipelineState(pipeline)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
