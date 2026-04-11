@@ -79,6 +79,7 @@ struct ContentView: View {
                 availableDisks = cache.availableDisks
                 availableHDs = cache.availableHDs
 
+                // Restore selections from last session (UI state only — no disk I/O)
                 let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
                 let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
                 let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
@@ -109,6 +110,8 @@ struct ContentView: View {
                     showSetupWarning = true
                 }
 
+                // Load boot ROM and mount only the previously-selected disks.
+                // Mounting is lazy — disks not selected are never read from disk.
                 let emulator = self.emulator
                 DispatchQueue.global(qos: .userInitiated).async {
                     emulator.loadBootROM()
@@ -242,8 +245,6 @@ struct ContentView: View {
         }
         emulator.mountDisk(url: disk.url, drive: drive)
     }
-
-    // Disk scanning is handled by ResourceCache.shared
 
     private func takeScreenshot() {
         guard let window = NSApplication.shared.mainWindow,

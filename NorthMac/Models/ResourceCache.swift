@@ -1,6 +1,7 @@
 import Foundation
 
 /// App-wide cache for boot ROM and disk catalog, loaded once and shared across windows.
+/// Disk validation results are persisted to a JSON file so subsequent launches skip I/O.
 final class ResourceCache {
     static let shared = ResourceCache()
 
@@ -37,7 +38,12 @@ final class ResourceCache {
 
     private func load() {
         let rom = Self.findBootROM()
-        let (disks, hds) = Self.scanDisks()
+        let validationCache = Self.loadValidationCache()
+        var updatedCache = validationCache
+        let (disks, hds) = Self.scanDisks(validationCache: validationCache, updatedCache: &updatedCache)
+        if updatedCache != validationCache {
+            Self.saveValidationCache(updatedCache)
+        }
 
         queue.sync {
             self.bootROMData = rom
@@ -79,9 +85,68 @@ final class ResourceCache {
         return Array(data)
     }
 
+    // MARK: - Validation cache (JSON)
+
+    /// Key: "filename:size:modDate" → cached ValidationResult fields
+    private typealias ValidationCacheMap = [String: CachedValidation]
+
+    private struct CachedValidation: Codable, Equatable {
+        let isValid: Bool
+        let isBootable: Bool
+        let format: String?  // "dsdd", "ssdd", "sssd", or nil
+        let platform: String // "Advantage", "Horizon", "Unknown"
+        let hasMED3C: Bool
+        let warnings: [String]
+    }
+
+    private static var validationCacheURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("NorthMac")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("disk_validation_cache.json")
+    }
+
+    private static func cacheKey(path: String, size: Int, modDate: Date) -> String {
+        let name = (path as NSString).lastPathComponent
+        let ts = Int(modDate.timeIntervalSince1970)
+        return "\(name):\(size):\(ts)"
+    }
+
+    private static func loadValidationCache() -> ValidationCacheMap {
+        guard let data = try? Data(contentsOf: validationCacheURL),
+              let map = try? JSONDecoder().decode(ValidationCacheMap.self, from: data) else {
+            return [:]
+        }
+        return map
+    }
+
+    private static func saveValidationCache(_ map: ValidationCacheMap) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        guard let data = try? encoder.encode(map) else { return }
+        try? data.write(to: validationCacheURL, options: .atomic)
+    }
+
+    private static func toValidationResult(_ cached: CachedValidation) -> DiskImage.ValidationResult {
+        let format: DiskImage.Format? = cached.format.flatMap { DiskImage.Format(rawValue: $0) }
+        let platform: DiskImage.ValidationResult.Platform =
+            DiskImage.ValidationResult.Platform(rawValue: cached.platform) ?? .unknown
+        return DiskImage.ValidationResult(
+            isValid: cached.isValid, isBootable: cached.isBootable, format: format,
+            platform: platform, hasMED3C: cached.hasMED3C, warnings: cached.warnings)
+    }
+
+    private static func toCachedValidation(_ v: DiskImage.ValidationResult) -> CachedValidation {
+        CachedValidation(
+            isValid: v.isValid, isBootable: v.isBootable,
+            format: v.format?.rawValue, platform: v.platform.rawValue,
+            hasMED3C: v.hasMED3C, warnings: v.warnings)
+    }
+
     // MARK: - Disk scanning
 
-    private static func scanDisks() -> ([DiskEntry], [DiskEntry]) {
+    private static func scanDisks(validationCache: ValidationCacheMap,
+                                   updatedCache: inout ValidationCacheMap) -> ([DiskEntry], [DiskEntry]) {
         let fm = FileManager.default
         var disks: [DiskEntry] = []
 
@@ -103,7 +168,24 @@ final class ResourceCache {
                     let name = (item as NSString).deletingPathExtension
                     guard !disks.contains(where: { $0.name == name }) else { continue }
                     let url = URL(fileURLWithPath: full)
-                    let validation = DiskImage.quickValidate(url: url)
+
+                    // Look up cached validation by file identity (name + size + mod date)
+                    let validation: DiskImage.ValidationResult
+                    if let attrs = try? fm.attributesOfItem(atPath: full),
+                       let size = attrs[.size] as? Int,
+                       let modDate = attrs[.modificationDate] as? Date {
+                        let key = cacheKey(path: full, size: size, modDate: modDate)
+                        if let cached = validationCache[key] {
+                            validation = toValidationResult(cached)
+                        } else {
+                            // Full validate once, then cache
+                            validation = DiskImage.validate(url: url)
+                            updatedCache[key] = toCachedValidation(validation)
+                        }
+                    } else {
+                        validation = DiskImage.quickValidate(url: url)
+                    }
+
                     disks.append(DiskEntry(id: full, name: name, url: url,
                                            category: category, validation: validation))
                 }
@@ -123,13 +205,11 @@ final class ResourceCache {
                 guard !hds.contains(where: { $0.name == name }) else { continue }
                 let full = (dir as NSString).appendingPathComponent(item)
                 let url = URL(fileURLWithPath: full)
-                let valid: Bool
-                if let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-                   data.count >= 128, data[0] == 0x00, data[1] == 0xFF {
-                    valid = true
-                } else {
-                    valid = false
-                }
+
+                // Just check file size for NHD — no need to read magic bytes at scan time
+                let attrs = try? fm.attributesOfItem(atPath: full)
+                let size = attrs?[.size] as? Int ?? 0
+                let valid = size >= 128
                 let validation = DiskImage.ValidationResult(
                     isValid: valid, isBootable: valid, format: nil,
                     platform: .advantage, hasMED3C: false,
