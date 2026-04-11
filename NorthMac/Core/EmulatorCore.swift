@@ -60,7 +60,17 @@ final class EmulatorCore: ObservableObject {
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
         cpu.userdata = selfPtr
 
-        // Set up callbacks
+        // Direct memory access — bypasses read_byte/write_byte callbacks
+        cpu.ram = memory.ram
+        cpu.mapping_regs = (
+            Int32(memory.mappingRegs[0]),
+            Int32(memory.mappingRegs[1]),
+            Int32(memory.mappingRegs[2]),
+            Int32(memory.mappingRegs[3])
+        )
+        cpu.use_direct_memory = true
+
+        // Keep callbacks as fallback (not used in direct memory mode for reads/writes)
         cpu.read_byte = { (userdata, addr) -> UInt8 in
             let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
             return core.memory.readByte(addr)
@@ -111,6 +121,16 @@ final class EmulatorCore: ObservableObject {
         print("Hard disk mounted: \(url.lastPathComponent) (\(data.count / 1024)K)")
     }
 
+    /// Sync CPU's direct-memory mapping registers from MemorySystem
+    func syncMappingRegs() {
+        cpu.mapping_regs = (
+            Int32(memory.mappingRegs[0]),
+            Int32(memory.mappingRegs[1]),
+            Int32(memory.mappingRegs[2]),
+            Int32(memory.mappingRegs[3])
+        )
+    }
+
     private var hasBooted = false
 
     func start() {
@@ -124,6 +144,7 @@ final class EmulatorCore: ObservableObject {
             memory.mappingRegs[1] = 0x0E * 0x4000
             memory.mappingRegs[2] = 0x0E * 0x4000
             memory.mappingRegs[3] = 0x0E * 0x4000
+            syncMappingRegs()
             cpu.pc = 0x8000
             hasBooted = true
         }
@@ -148,32 +169,16 @@ final class EmulatorCore: ObservableObject {
         // Wait for thread to finish
         Thread.sleep(forTimeInterval: 0.05)
 
-        // Re-init CPU but preserve callbacks
+        // Re-init CPU and restore all state
         z80_init(&cpu)
-        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-        cpu.userdata = selfPtr
-        cpu.read_byte = { (userdata, addr) -> UInt8 in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
-            return core.memory.readByte(addr)
-        }
-        cpu.write_byte = { (userdata, addr, value) in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
-            core.memory.writeByte(addr, value)
-        }
-        cpu.port_in = { (z80ptr, port) -> UInt8 in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(z80ptr!.pointee.userdata!).takeUnretainedValue()
-            return core.io.portIn(port)
-        }
-        cpu.port_out = { (z80ptr, port, value) in
-            let core = Unmanaged<EmulatorCore>.fromOpaque(z80ptr!.pointee.userdata!).takeUnretainedValue()
-            core.io.portOut(port, value)
-        }
+        setupCPU()
 
         // Reset memory mappings
         memory.mappingRegs[0] = 8 * 0x4000
         memory.mappingRegs[1] = 9 * 0x4000
         memory.mappingRegs[2] = 0x0E * 0x4000
         memory.mappingRegs[3] = 0 * 0x4000
+        syncMappingRegs()
         memory.blankingFlag = 0
 
         // Clear video RAM (pages 8-9) for clean display on reset

@@ -13,6 +13,11 @@ struct z80 {
   void (*port_out)(z80*, uint8_t, uint8_t);
   void* userdata;
 
+  // Direct memory access (bypasses read_byte/write_byte callbacks when set)
+  uint8_t* ram;             // pointer to 256KB physical RAM
+  int mapping_regs[4];      // maps logical 16KB pages to physical byte offsets
+  bool use_direct_memory;   // enable direct memory access mode
+
   unsigned long cyc; // cycle count (t-states)
 
   uint16_t pc, sp, ix, iy; // special purpose registers
