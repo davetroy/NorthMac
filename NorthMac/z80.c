@@ -1638,26 +1638,24 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0x4D: ret(z); break; // reti
 
   case 0xA0: ldi(z); break; // ldi
-  case 0xB0: {
-    ldi(z);
-
-    if (get_bc(z) != 0) {
-      z->pc -= 2;
+  case 0xB0: { // ldir — fast-path: loop in C instead of re-decoding per byte
+    do {
+      ldi(z);
+      if (get_bc(z) == 0) break;
       z->cyc += 5;
-      z->mem_ptr = z->pc + 1;
-    }
-  } break; // ldir
+    } while (1);
+    z->mem_ptr = z->pc + 1;
+  } break;
 
   case 0xA8: ldd(z); break; // ldd
-  case 0xB8: {
-    ldd(z);
-
-    if (get_bc(z) != 0) {
-      z->pc -= 2;
+  case 0xB8: { // lddr — fast-path: loop in C instead of re-decoding per byte
+    do {
+      ldd(z);
+      if (get_bc(z) == 0) break;
       z->cyc += 5;
-      z->mem_ptr = z->pc + 1;
-    }
-  } break; // lddr
+    } while (1);
+    z->mem_ptr = z->pc + 1;
+  } break;
 
   case 0xA1: cpi(z); break; // cpi
   case 0xA9: cpd(z); break; // cpd
