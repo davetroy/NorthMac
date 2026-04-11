@@ -289,6 +289,13 @@ final class EmulatorCore: ObservableObject {
                 }
             }
 
+            // HALT idle: when Z80 is halted, skip to frame boundary
+            // The CPU is waiting for an interrupt (display flag at ~60Hz).
+            // No point burning host CPU on NOP cycles.
+            if cpu.halted && !turboMode {
+                frameCycles = cyclesPerFrame
+            }
+
             // Frame timing
             if frameCycles >= cyclesPerFrame {
                 frameCycles = 0
