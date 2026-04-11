@@ -234,10 +234,7 @@ final class IOSystem {
     func getStatusReg1() -> UInt8 {
         let fdc = emulator.fdc
 
-        // Advance FDC state machine
-        fdc.floppyState()
-
-        // Also sync display flag from FDC
+        // Sync display flag from FDC (run loop advances FDC state machine)
         if fdc.displayFlag {
             displayFlag = true
             fdc.displayFlag = false
@@ -294,10 +291,7 @@ final class IOSystem {
     func getStatusReg2() -> UInt8 {
         let fdc = emulator.fdc
 
-        // Advance FDC state machine
-        fdc.floppyState()
-
-        // Sync display flag
+        // Sync display flag from FDC (run loop advances FDC state machine)
         if fdc.displayFlag {
             displayFlag = true
             fdc.displayFlag = false
