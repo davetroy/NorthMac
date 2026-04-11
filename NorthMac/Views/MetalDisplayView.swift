@@ -21,8 +21,36 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
 
     override var acceptsFirstResponder: Bool { true }
 
-    func setup() {
+    // Shared Metal resources — compiled once, reused across all windows
+    private static var sharedDevice: MTLDevice?
+    private static var sharedPipeline: MTLRenderPipelineState?
+    private static var sharedSetupDone = false
+
+    /// Call early (e.g. from App.init) to compile the shader before any window opens.
+    static func precompileShader() { ensureSharedSetup() }
+
+    private static func ensureSharedSetup() {
+        guard !sharedSetupDone else { return }
+        sharedSetupDone = true
         guard let device = MTLCreateSystemDefaultDevice() else { return }
+        sharedDevice = device
+        do {
+            let library = try device.makeLibrary(source: shaderSource, options: nil)
+            guard let vf = library.makeFunction(name: "vertexShader"),
+                  let ff = library.makeFunction(name: "fragmentShader") else { return }
+            let desc = MTLRenderPipelineDescriptor()
+            desc.vertexFunction = vf
+            desc.fragmentFunction = ff
+            desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+            sharedPipeline = try device.makeRenderPipelineState(descriptor: desc)
+        } catch {
+            print("Metal shader error: \(error)")
+        }
+    }
+
+    func setup() {
+        Self.ensureSharedSetup()
+        guard let device = Self.sharedDevice else { return }
         self.device = device
         self.delegate = self
         self.colorPixelFormat = .bgra8Unorm
@@ -33,6 +61,7 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
         self.framebufferOnly = true
 
         commandQueue = device.makeCommandQueue()
+        pipelineState = Self.sharedPipeline
 
         let vertices: [Float] = [
             -1, -1,  0, 1,
@@ -50,19 +79,6 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
         texDesc.usage = [.shaderRead]
         texDesc.storageMode = .managed
         videoTexture = device.makeTexture(descriptor: texDesc)
-
-        do {
-            let library = try device.makeLibrary(source: MetalDisplayNSView.shaderSource, options: nil)
-            guard let vf = library.makeFunction(name: "vertexShader"),
-                  let ff = library.makeFunction(name: "fragmentShader") else { return }
-            let desc = MTLRenderPipelineDescriptor()
-            desc.vertexFunction = vf
-            desc.fragmentFunction = ff
-            desc.colorAttachments[0].pixelFormat = colorPixelFormat
-            pipelineState = try device.makeRenderPipelineState(descriptor: desc)
-        } catch {
-            print("Metal shader error: \(error)")
-        }
     }
 
     // MARK: - MTKViewDelegate
