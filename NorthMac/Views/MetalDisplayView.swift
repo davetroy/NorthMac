@@ -78,7 +78,7 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
               let videoTex = videoTexture else { return }
 
         // Upload video RAM (reuse texData buffer — no allocation)
-        let ram = emulator.memory.ram
+        let ram = emulator.memory.ram  // UnsafeMutablePointer — no COW copy
         let scroll = Int(emulator.io.scanline)
         if emulator.io.blankDisplay {
             texData.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }

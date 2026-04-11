@@ -3,7 +3,10 @@ import Foundation
 /// NorthStar Advantage memory system: 256KB physical RAM with bank switching
 final class MemorySystem {
     // 256KB physical memory (16 pages x 16KB)
-    var ram: [UInt8]
+    // Uses a raw pointer buffer instead of [UInt8] to avoid Swift COW races
+    // when the emulator thread and main thread access memory concurrently.
+    static let ramSize = 256 * 1024
+    let ram: UnsafeMutablePointer<UInt8>
 
     // 4 mapping registers: map logical 16KB pages to physical pages
     // Each stores the base physical address (page * 0x4000)
@@ -19,7 +22,8 @@ final class MemorySystem {
     var bootROM: [UInt8] = []
 
     init() {
-        ram = [UInt8](repeating: 0, count: 256 * 1024)
+        ram = .allocate(capacity: MemorySystem.ramSize)
+        ram.initialize(repeating: 0, count: MemorySystem.ramSize)
 
         // Initial mapping registers (from ade_main.c:155-158)
         mappingRegs[0] = 8 * 0x4000   // page 8 = video RAM
@@ -27,6 +31,11 @@ final class MemorySystem {
         mappingRegs[2] = 0x0E * 0x4000 // page 14 = boot PROM
         mappingRegs[3] = 0 * 0x4000    // page 0 = main RAM
 
+    }
+
+    deinit {
+        ram.deinitialize(count: MemorySystem.ramSize)
+        ram.deallocate()
     }
 
     func loadBootROM(data: [UInt8]) {
@@ -52,7 +61,7 @@ final class MemorySystem {
             let pageBase = promBase + page * 0x4000
             for offset in stride(from: 0, to: 0x4000, by: promSize) {
                 for i in 0..<promSize {
-                    if pageBase + offset + i < ram.count {
+                    if pageBase + offset + i < MemorySystem.ramSize {
                         ram[pageBase + offset + i] = patched[i]
                     }
                 }
