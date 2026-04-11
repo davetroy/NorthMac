@@ -273,12 +273,6 @@ final class EmulatorCore: ObservableObject {
                 syncMappingRegs()
             }
 
-            // Propagate video dirty flag from C core to Swift
-            if cpu.video_dirty {
-                cpu.video_dirty = false
-                memory.videoDirty = true
-            }
-
             // Check interrupt flag (set by port callbacks)
             if io.intPending {
                 io.intPending = false
@@ -310,6 +304,12 @@ final class EmulatorCore: ObservableObject {
             // Frame timing
             if frameCycles >= cyclesPerFrame {
                 frameCycles = 0
+
+                // Propagate video dirty flag from C core to Swift (display reads at 60fps)
+                if cpu.video_dirty {
+                    cpu.video_dirty = false
+                    memory.videoDirty = true
+                }
 
                 // Pause audio engine during sustained silence
                 audio.checkSilence()
