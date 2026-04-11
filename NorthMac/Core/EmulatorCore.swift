@@ -23,6 +23,9 @@ final class EmulatorCore: ObservableObject {
     private var instructionCount: Int = 0
     private let floppyPulse = 0x22  // 34 instructions between FDC advances
 
+    // Set by IOSystem when mapping registers change; synced to CPU after z80_step
+    var mappingRegsDirty = false
+
     // Performance benchmark: published so UI can display
     @Published var benchmarkMHz: Double = 0.0
     @Published var benchmarkFPS: Double = 0.0
@@ -260,6 +263,12 @@ final class EmulatorCore: ObservableObject {
             let cycBefore = cpu.cyc
             z80_step(&cpu)
             frameCycles &+= cpu.cyc &- cycBefore
+
+            // Sync mapping registers if changed by I/O port write
+            if mappingRegsDirty {
+                mappingRegsDirty = false
+                syncMappingRegs()
+            }
 
             // Check interrupt flag (set by port callbacks)
             if io.intPending {

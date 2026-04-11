@@ -134,7 +134,7 @@ final class IOSystem {
         case 0x0A:
             // Memory mapping registers
             emulator?.memory.mapRegisterWrite(reg: Int(pLo), data: data)
-            emulator?.syncMappingRegs()
+            emulator?.mappingRegsDirty = true
 
         case 0x0B:
             // Clear display flag (allows next pulse to generate INT)
