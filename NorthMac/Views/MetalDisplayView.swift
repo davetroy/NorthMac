@@ -11,7 +11,7 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
     private var pipelineState: MTLRenderPipelineState?
     private var videoTexture: MTLTexture?
     private var vertexBuffer: MTLBuffer?
-    private var texData = [UInt8](repeating: 0, count: 80 * 256)
+    private static var blankTexData = [UInt8](repeating: 0, count: 80 * 256)
     private var lastScrollValue: Int = -1  // force first frame to render
 
     var phosphorIndex: Int = 0
@@ -110,9 +110,8 @@ class MetalDisplayNSView: MTKView, MTKViewDelegate {
             // No CPU transpose needed; scroll handled in shader
             let ram = emulator.memory.ram  // UnsafeMutablePointer — no COW copy
             if emulator.io.blankDisplay {
-                texData.withUnsafeMutableBufferPointer { $0.update(repeating: 0) }
                 videoTex.replace(region: MTLRegionMake2D(0, 0, 256, 80),
-                                 mipmapLevel: 0, withBytes: &texData, bytesPerRow: 256)
+                                 mipmapLevel: 0, withBytes: &Self.blankTexData, bytesPerRow: 256)
             } else {
                 // Direct memcpy from video RAM (80 columns × 256 bytes each)
                 videoTex.replace(region: MTLRegionMake2D(0, 0, 256, 80),

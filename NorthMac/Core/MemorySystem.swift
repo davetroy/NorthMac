@@ -67,6 +67,8 @@ final class MemorySystem {
                 }
             }
         }
+        // Data is now in RAM; release the Swift array
+        bootROM = []
     }
 
     // Translate logical Z80 address to physical address

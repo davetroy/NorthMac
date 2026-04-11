@@ -30,16 +30,10 @@ final class HardDiskController {
 
     // MARK: - Controller state
 
-    var diskData: Data?
     private var diskStore: UnsafeMutablePointer<UInt8>?
     private var diskStoreSize: Int = 0
     var fileName: String = ""
-    var mounted: Bool { diskData != nil }
-
-    // Sector cache: precomputed headers + data for each sector
-    // Stored flat: sectorCache[sectorIndex * cacheSize ..< (sectorIndex+1) * cacheSize]
-    private var sectorCachePtr: UnsafeMutablePointer<UInt8>?
-    private var sectorCacheSize: Int = 0
+    var mounted: Bool { diskStore != nil }
 
     // Cache RAM (1024 bytes) — the HDC's onboard buffer
     var cacheRAM: [UInt8] = [UInt8](repeating: 0, count: 1024)
@@ -77,7 +71,6 @@ final class HardDiskController {
 
     deinit {
         freeDiskStore()
-        freeSectorCache()
     }
 
     private func freeDiskStore() {
@@ -89,23 +82,12 @@ final class HardDiskController {
         }
     }
 
-    private func freeSectorCache() {
-        if let ptr = sectorCachePtr {
-            ptr.deinitialize(count: sectorCacheSize)
-            ptr.deallocate()
-            sectorCachePtr = nil
-            sectorCacheSize = 0
-        }
-    }
-
     func mount(data: Data) {
         guard data.count >= 128,
               data[0] == 0x00, data[1] == 0xFF else {
             NSLog("HDC: Invalid NHD file (bad magic bytes)")
             return
         }
-
-        diskData = data
 
         // Copy data into a raw buffer (avoids Swift Array COW overhead)
         freeDiskStore()
@@ -126,9 +108,6 @@ final class HardDiskController {
         NSLog("HDC: Mounted — %d cyl, %d heads, %d sectors (%dK)",
               maxCylinders + 1, maxHeads + 1, totalSectors, data.count / 1024)
 
-        // Build sector cache (headers + data)
-        buildSectorCache()
-
         // Initialize state
         cylinder = 0
         sectorNum = 14
@@ -145,9 +124,7 @@ final class HardDiskController {
     }
 
     func unmount() {
-        diskData = nil
         freeDiskStore()
-        freeSectorCache()
         fileName = ""
         driveReady = false
         driveSelected = false
@@ -405,104 +382,83 @@ final class HardDiskController {
         }
     }
 
-    // MARK: - Sector Cache
-
-    private func buildSectorCache() {
-        let heads = maxHeads + 1
-        freeSectorCache()
-        sectorCacheSize = totalSectors * Self.cacheSize
-        let cache = UnsafeMutablePointer<UInt8>.allocate(capacity: sectorCacheSize)
-        cache.initialize(repeating: 0, count: sectorCacheSize)
-        sectorCachePtr = cache
-
-        guard let store = diskStore else { return }
-
-        for i in 0..<totalSectors {
-            let baseOffset = i * Self.cacheSize
-
-            // Build header
-            let phys = i % 16
-            let shftrk = i & 0xFFF0
-            var logical = phys
-            if phys % 2 != 0 { logical = (logical + 8) % 16 }
-            logical += shftrk
-
-            let chead = (i % (16 * heads)) / 16
-            let ccyl = i / (16 * heads)
-            let cylFactor = UInt8((ccyl & 0x300) >> 4)
-            let cylLo = UInt8(ccyl & 0xFF)
-
-            cache[baseOffset + 0] = 0x00  // start marker
-            cache[baseOffset + 1] = UInt8(phys) | cylFactor
-            cache[baseOffset + 2] = cylLo
-            cache[baseOffset + 3] = UInt8(chead) | (i < 16 || i > maxSectors ? 0x80 : 0)
-            cache[baseOffset + 4] = UInt8(logical & 0xFF)
-            cache[baseOffset + 5] = UInt8(logical >> 8)
-            cache[baseOffset + 6] = UInt8(shftrk & 0xFF)
-            cache[baseOffset + 7] = UInt8(shftrk >> 8)
-
-            // Header CRC
-            var crc: UInt8 = 0
-            for j in 1...7 { crc = crc &+ cache[baseOffset + j] }
-            cache[baseOffset + 8] = crc
-            cache[baseOffset + 9] = ~crc
-
-            // Load 512-byte sector data from file via memcpy
-            let fileOffset = i * Self.sectorDataSize
-            if fileOffset + Self.sectorDataSize <= diskStoreSize {
-                memcpy(cache + baseOffset + Self.headerSize, store + fileOffset, Self.sectorDataSize)
-            }
-
-            // Data CRC (over 512 bytes) — sum all data bytes
-            let dataStart = cache + baseOffset + Self.headerSize
-            var dataCRC: Int = 0
-            // Process 8 bytes at a time for speed
-            var j = 0
-            while j + 7 < Self.sectorDataSize {
-                dataCRC += Int(dataStart[j]) + Int(dataStart[j+1]) + Int(dataStart[j+2]) + Int(dataStart[j+3])
-                    + Int(dataStart[j+4]) + Int(dataStart[j+5]) + Int(dataStart[j+6]) + Int(dataStart[j+7])
-                j += 8
-            }
-            while j < Self.sectorDataSize {
-                dataCRC += Int(dataStart[j])
-                j += 1
-            }
-            let crcHi = UInt8((dataCRC >> 8) & 0xFF)
-            let crcLo = UInt8(dataCRC & 0xFF)
-            cache[baseOffset + 0x20A] = crcHi
-            cache[baseOffset + 0x20B] = crcLo
-            cache[baseOffset + 0x20C] = ~crcHi
-            cache[baseOffset + 0x20D] = ~crcLo
-        }
-    }
+    // MARK: - Sector Addressing & Header Computation
 
     private func sectorAddress() -> Int {
         return ((cylinder * (maxHeads + 1)) + surface) * Self.sectorsPerTrack + sectorNum
     }
 
+    /// Compute the 10-byte sector header for sector index `i` into cacheRAM[0..<10]
+    private func computeHeader(for i: Int) {
+        let heads = maxHeads + 1
+        let phys = i % 16
+        let shftrk = i & 0xFFF0
+        var logical = phys
+        if phys % 2 != 0 { logical = (logical + 8) % 16 }
+        logical += shftrk
+
+        let chead = (i % (16 * heads)) / 16
+        let ccyl = i / (16 * heads)
+        let cylFactor = UInt8((ccyl & 0x300) >> 4)
+        let cylLo = UInt8(ccyl & 0xFF)
+
+        cacheRAM[0] = 0x00  // start marker
+        cacheRAM[1] = UInt8(phys) | cylFactor
+        cacheRAM[2] = cylLo
+        cacheRAM[3] = UInt8(chead) | (i < 16 || i > maxSectors ? 0x80 : 0)
+        cacheRAM[4] = UInt8(logical & 0xFF)
+        cacheRAM[5] = UInt8(logical >> 8)
+        cacheRAM[6] = UInt8(shftrk & 0xFF)
+        cacheRAM[7] = UInt8(shftrk >> 8)
+
+        // Header CRC
+        var crc: UInt8 = 0
+        for j in 1...7 { crc = crc &+ cacheRAM[j] }
+        cacheRAM[8] = crc
+        cacheRAM[9] = ~crc
+    }
+
     private func copyCacheHeader() {
         let addr = sectorAddress()
-        guard addr >= 0 && addr < totalSectors, let cache = sectorCachePtr else { return }
-        let base = addr * Self.cacheSize
-        for k in 0..<Self.headerSize {
-            cacheRAM[k] = cache[base + k]
-        }
+        guard addr >= 0 && addr < totalSectors else { return }
+        computeHeader(for: addr)
         ramPtr = Self.headerSize
     }
 
     private func copySectorToRAM() {
         let addr = sectorAddress()
-        guard addr >= 0 && addr < totalSectors, let cache = sectorCachePtr else { return }
-        let base = addr * Self.cacheSize
-        // Copy all 526 bytes (10 header + 512 data + 4 CRC) to cache RAM
-        for k in 0..<Self.cacheSize {
-            cacheRAM[k] = cache[base + k]
+        guard addr >= 0 && addr < totalSectors, let store = diskStore else { return }
+
+        // Compute header (10 bytes)
+        computeHeader(for: addr)
+
+        // Copy 512 bytes of sector data from diskStore
+        let fileOffset = addr * Self.sectorDataSize
+        var dataCRC: Int = 0
+        for j in 0..<Self.sectorDataSize {
+            let byte: UInt8
+            if fileOffset + j < diskStoreSize {
+                byte = store[fileOffset + j]
+            } else {
+                byte = 0
+            }
+            cacheRAM[Self.headerSize + j] = byte
+            dataCRC += Int(byte)
         }
+
+        // Append 4-byte data CRC
+        let crcHi = UInt8((dataCRC >> 8) & 0xFF)
+        let crcLo = UInt8(dataCRC & 0xFF)
+        cacheRAM[Self.headerSize + Self.sectorDataSize] = crcHi
+        cacheRAM[Self.headerSize + Self.sectorDataSize + 1] = crcLo
+        cacheRAM[Self.headerSize + Self.sectorDataSize + 2] = ~crcHi
+        cacheRAM[Self.headerSize + Self.sectorDataSize + 3] = ~crcLo
+
         ramPtr = Self.cacheSize
     }
 
     private func writeCachedSector() {
-        guard syncOffset > 0, let cache = sectorCachePtr, let store = diskStore else { return }
+        guard syncOffset > 0, let store = diskStore else { return }
 
         let physSector = Int(cacheRAM[syncOffset + 1]) & 0x0F
         let cylFactor = Int(cacheRAM[syncOffset + 1] & 0x30) << 4
@@ -513,37 +469,14 @@ final class HardDiskController {
         let fileOffset = sectorAddr * Self.sectorDataSize
 
         guard sectorAddr >= 0 && sectorAddr < totalSectors else { return }
-        let cacheBase = sectorAddr * Self.cacheSize
 
-        // Copy header from write cache to sector cache
-        cache[cacheBase] = 0  // start marker
-        for j in 1..<Self.headerSize {
-            if syncOffset + j < cacheRAM.count {
-                cache[cacheBase + j] = cacheRAM[syncOffset + j]
-            }
-        }
-
-        // Copy 512 data bytes to sector cache AND backing store
+        // Write 512 data bytes to backing store
         for j in 0..<Self.sectorDataSize {
             let src = syncOffset + Self.headerSize + j
             guard src < cacheRAM.count else { break }
-            let byte = cacheRAM[src]
-            cache[cacheBase + Self.headerSize + j] = byte
             if fileOffset + j < diskStoreSize {
-                store[fileOffset + j] = byte
+                store[fileOffset + j] = cacheRAM[src]
             }
         }
-
-        // Recalculate data CRC so subsequent reads verify correctly
-        var dataCRC: Int = 0
-        for j in 0..<Self.sectorDataSize {
-            dataCRC += Int(cache[cacheBase + Self.headerSize + j])
-        }
-        let crcHi = UInt8((dataCRC >> 8) & 0xFF)
-        let crcLo = UInt8(dataCRC & 0xFF)
-        cache[cacheBase + 0x20A] = crcHi
-        cache[cacheBase + 0x20B] = crcLo
-        cache[cacheBase + 0x20C] = ~crcHi
-        cache[cacheBase + 0x20D] = ~crcLo
     }
 }
