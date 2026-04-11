@@ -9,3 +9,9 @@ DerivedData/
 *.NHD
 *.nhd
 *.bin
+
+# Claude Code project instructions
+CLAUDE.md
+
+# Built application
+*.app
