@@ -26,6 +26,7 @@ final class EmulatorCore: ObservableObject {
     // Set by IOSystem when mapping registers change; synced to CPU after z80_step
     var mappingRegsDirty = false
 
+
     // Performance benchmark: published so UI can display
     @Published var benchmarkMHz: Double = 0.0
     @Published var benchmarkFPS: Double = 0.0
@@ -92,6 +93,10 @@ final class EmulatorCore: ObservableObject {
         cpu.port_out = { (z80ptr, port, value) in
             let core = Unmanaged<EmulatorCore>.fromOpaque(z80ptr!.pointee.userdata!).takeUnretainedValue()
             core.io.portOut(port, value)
+            // Propagate mapping_regs_dirty to z80 struct for C run loop
+            if core.mappingRegsDirty {
+                z80ptr!.pointee.mapping_regs_dirty = true
+            }
         }
     }
 
@@ -226,155 +231,151 @@ final class EmulatorCore: ObservableObject {
     private var autoEnterDelay: Int = 0
 
     private func runLoop() {
-        let cyclesPerFrame: UInt = 4_000_000 / 60  // ~66666 cycles per frame at 4MHz/60fps
-        var frameCycles: UInt = 0
-        var fdcCounter: Int = 0
-
         // Benchmark: measure cycles/sec and frames/sec over 1-second windows
         var benchCycleStart = cpu.cyc
         var benchFrameCount: UInt = 0
         var benchStartTime = mach_absolute_time()
         var machTimebaseRatio: Double = 1.0
-        var machTimebaseInverse: Double = 1.0  // ns→mach
+        var machTimebaseInverse: Double = 1.0
         do {
             var info = mach_timebase_info_data_t()
             mach_timebase_info(&info)
             machTimebaseRatio = Double(info.numer) / Double(info.denom)
             machTimebaseInverse = Double(info.denom) / Double(info.numer)
         }
-        // Frame interval in mach absolute time units (16.667ms)
         let frameIntervalMach = UInt64(16_666_667 * machTimebaseInverse)
         var nextFrameTime = mach_absolute_time() + frameIntervalMach
 
+        // Set up C frame context
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        var ctx = frame_context()
+        // cpu is a stored property on a class — stable address via withUnsafeMutablePointer
+        withUnsafeMutablePointer(to: &cpu) { cpuPtr in
+            ctx.cpu = cpuPtr
+        }
+        ctx.cycles_per_frame = 4_000_000 / 60
+        ctx.frame_cycles = 0
+        ctx.fdc_pulse = Int32(floppyPulse)
+        ctx.should_run = true
+        ctx.trap_active = true
+        ctx.trap_pc1 = 0xF33C
+        ctx.trap_pc2 = 0xF33F
+        ctx.userdata = selfPtr
+
+        // FDC callback: advance state machine, handle display interrupt
+        // Receives z80* directly from C to avoid Swift exclusivity issues with core.cpu
+        ctx.fdc_callback = { userdata, cpuPtr in
+            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
+            core.fdc.floppyState()
+            if core.fdc.displayFlag {
+                core.io.displayFlag = true
+                core.fdc.displayFlag = false
+            }
+            if core.io.displayFlag && core.io.displayInterruptEnabled && !core.io.displayIntFired {
+                cpuPtr!.pointee.int_pending = true
+                cpuPtr!.pointee.int_data = 0xFF
+                core.io.displayIntFired = true
+            }
+            if core.io.intPending {
+                core.io.intPending = false
+                cpuPtr!.pointee.int_pending = true
+                cpuPtr!.pointee.int_data = 0xFF
+            }
+        }
+
+        // MED3C trap callback
+        ctx.trap_callback = { userdata in
+            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
+            if !core.med3cPollingScanned {
+                core.med3cPollingScanned = true
+                core.scanBootLoaderPolling()
+            }
+            core.handleMED3CTrap()
+        }
+
+        // Mapping register sync callback
+        ctx.sync_mapping = { userdata in
+            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
+            core.mappingRegsDirty = false
+            core.syncMappingRegs()
+        }
+
         while shouldRun {
-            // MED3C trap: intercept CALL F33C/F33F when F33C is a RET stub (C9).
-            // Once the boot loader patches F33C with C3 (JP to disk's own MED3C),
-            // we let the Z80 execute natively — the disk's MED3C handles it.
-            let pc = cpu.pc
-            if pc == 0xF33C || pc == 0xF33F {
-                if memory.readByte(0xF33C) == 0xC9 {
-                    if !med3cPollingScanned {
-                        med3cPollingScanned = true
-                        scanBootLoaderPolling()
-                    }
-                    handleMED3CTrap()
-                    fdcCounter += 1
-                    continue
-                }
+            ctx.should_run = true
+
+            // Run one frame in the tight C loop
+            let result = emulator_run_frame(&ctx)
+
+            // Propagate video dirty flag from C core to Swift
+            if cpu.video_dirty {
+                cpu.video_dirty = false
+                memory.videoDirty = true
             }
 
-            let cycBefore = cpu.cyc
-            z80_step(&cpu)
-            frameCycles &+= cpu.cyc &- cycBefore
+            // Pause audio engine during sustained silence
+            audio.checkSilence()
 
-            // Sync mapping registers if changed by I/O port write
-            if mappingRegsDirty {
-                mappingRegsDirty = false
-                syncMappingRegs()
+            // HALT idle: if Z80 halted in non-turbo, just sleep
+            if result == 1 && !turboMode {
+                // halted — sleep until next frame
             }
 
-            // Check interrupt flag (set by port callbacks)
-            if io.intPending {
-                io.intPending = false
-                z80_gen_int(&cpu, 0xFF)
-            }
-
-            // Advance FDC state machine every ~34 instructions
-            fdcCounter += 1
-            if fdcCounter >= floppyPulse {
-                fdcCounter = 0
-                fdc.floppyState()
-                if fdc.displayFlag {
-                    io.displayFlag = true
-                    fdc.displayFlag = false
-                }
-                if io.displayFlag && io.displayInterruptEnabled && !io.displayIntFired {
-                    z80_gen_int(&cpu, 0xFF)
-                    io.displayIntFired = true
-                }
-            }
-
-            // HALT idle: when Z80 is halted, skip to frame boundary
-            // The CPU is waiting for an interrupt (display flag at ~60Hz).
-            // No point burning host CPU on NOP cycles.
-            if cpu.halted && !turboMode {
-                frameCycles = cyclesPerFrame
-            }
-
-            // Frame timing
-            if frameCycles >= cyclesPerFrame {
-                frameCycles = 0
-
-                // Propagate video dirty flag from C core to Swift (display reads at 60fps)
-                if cpu.video_dirty {
-                    cpu.video_dirty = false
-                    memory.videoDirty = true
-                }
-
-                // Pause audio engine during sustained silence
-                audio.checkSilence()
-
-                // Auto-inject ENTER key for "LOAD SYSTEM" prompt during automated testing
-                if !autoEnterInjected {
-                    autoEnterDelay += 1
-                    if autoEnterDelay > 120 {  // ~2 seconds at 60fps
-                        // Check video RAM for "LOAD" text (indicates prompt is displayed)
-                        let videoBase = 0x20000
-                        let row3start = videoBase + 3 * 80  // check a few rows
-                        var hasContent = false
-                        for i in 0..<80 {
-                            if memory.ram[row3start + i] != 0x00 {
-                                hasContent = true
-                                break
-                            }
-                        }
-                        if hasContent {
-                            io.keyPress(0x0D)  // ENTER key
-                            autoEnterInjected = true
-                            if Self.debugLogging { NSLog("AUTO: Injected ENTER key for LOAD SYSTEM prompt") }
-                        }
-                    }
-                }
-
-
-                // Write boot status to /tmp for automated testing (~10s after ENTER)
-                if autoEnterInjected && autoEnterDelay == 720 {
-                    writeBootStatus()
-                }
+            // Auto-inject ENTER key for "LOAD SYSTEM" prompt during automated testing
+            if !autoEnterInjected {
                 autoEnterDelay += 1
-
-                // Benchmark: report every second
-                benchFrameCount += 1
-                let now = mach_absolute_time()
-                let elapsedNs = Double(now - benchStartTime) * machTimebaseRatio
-                if elapsedNs >= 1_000_000_000 {
-                    let elapsedSec = elapsedNs / 1_000_000_000
-                    let cyclesElapsed = cpu.cyc - benchCycleStart
-                    let mhz = Double(cyclesElapsed) / elapsedSec / 1_000_000
-                    let fps = Double(benchFrameCount) / elapsedSec
-                    DispatchQueue.main.async { [weak self] in
-                        self?.benchmarkMHz = mhz
-                        self?.benchmarkFPS = fps
+                if autoEnterDelay > 120 {
+                    let videoBase = 0x20000
+                    let row3start = videoBase + 3 * 80
+                    var hasContent = false
+                    for i in 0..<80 {
+                        if memory.ram[row3start + i] != 0x00 {
+                            hasContent = true
+                            break
+                        }
                     }
-                    // Write to file for automated collection
-                    let line = String(format: "%.2f MHz, %.1f fps, turbo=%d\n", mhz, fps, turboMode ? 1 : 0)
-                    try? line.write(toFile: "/tmp/northmac_benchmark.txt", atomically: true, encoding: .utf8)
-                    benchCycleStart = cpu.cyc
-                    benchFrameCount = 0
-                    benchStartTime = now
+                    if hasContent {
+                        io.keyPress(0x0D)
+                        autoEnterInjected = true
+                        if Self.debugLogging { NSLog("AUTO: Injected ENTER key for LOAD SYSTEM prompt") }
+                    }
                 }
+            }
 
-                if !turboMode {
-                    let now = mach_absolute_time()
-                    if now < nextFrameTime {
-                        mach_wait_until(nextFrameTime)
-                    }
-                    nextFrameTime += frameIntervalMach
-                    // Prevent drift accumulation if we fell behind
-                    let currentTime = mach_absolute_time()
-                    if nextFrameTime < currentTime {
-                        nextFrameTime = currentTime + frameIntervalMach
-                    }
+            // Write boot status to /tmp for automated testing (~10s after ENTER)
+            if autoEnterInjected && autoEnterDelay == 720 {
+                writeBootStatus()
+            }
+            autoEnterDelay += 1
+
+            // Benchmark: report every second
+            benchFrameCount += 1
+            let now = mach_absolute_time()
+            let elapsedNs = Double(now - benchStartTime) * machTimebaseRatio
+            if elapsedNs >= 1_000_000_000 {
+                let elapsedSec = elapsedNs / 1_000_000_000
+                let cyclesElapsed = cpu.cyc - benchCycleStart
+                let mhz = Double(cyclesElapsed) / elapsedSec / 1_000_000
+                let fps = Double(benchFrameCount) / elapsedSec
+                DispatchQueue.main.async { [weak self] in
+                    self?.benchmarkMHz = mhz
+                    self?.benchmarkFPS = fps
+                }
+                let line = String(format: "%.2f MHz, %.1f fps, turbo=%d\n", mhz, fps, turboMode ? 1 : 0)
+                try? line.write(toFile: "/tmp/northmac_benchmark.txt", atomically: true, encoding: .utf8)
+                benchCycleStart = cpu.cyc
+                benchFrameCount = 0
+                benchStartTime = now
+            }
+
+            if !turboMode {
+                let sleepNow = mach_absolute_time()
+                if sleepNow < nextFrameTime {
+                    mach_wait_until(nextFrameTime)
+                }
+                nextFrameTime += frameIntervalMach
+                let currentTime = mach_absolute_time()
+                if nextFrameTime < currentTime {
+                    nextFrameTime = currentTime + frameIntervalMach
                 }
             }
         }

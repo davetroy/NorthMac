@@ -768,6 +768,7 @@ void z80_init(z80* const z) {
   z->ram = NULL;
   z->use_direct_memory = false;
   z->video_dirty = false;
+  z->mapping_regs_dirty = false;
   for (int i = 0; i < 4; i++) z->mapping_regs[i] = 0;
 }
 
@@ -798,6 +799,56 @@ unsigned long z80_run(z80* const z, unsigned long max_cycles) {
     process_interrupts(z);
   }
   return z->cyc - start;
+}
+
+// Tight C run loop for one frame. Returns 0=frame done, 1=halted, 2=stopped.
+// FDC callback fires every fdc_pulse instructions. MED3C trap checked per-instruction.
+int emulator_run_frame(frame_context* ctx) {
+  z80* z = ctx->cpu;
+  int fdc_counter = 0;
+  const int fdc_pulse = ctx->fdc_pulse;
+  const unsigned long target = ctx->cycles_per_frame;
+  unsigned long frame_cycles = 0;
+
+  while (frame_cycles < target && ctx->should_run) {
+    // MED3C trap check
+    if (ctx->trap_active) {
+      uint16_t pc = z->pc;
+      if (pc == ctx->trap_pc1 || pc == ctx->trap_pc2) {
+        if (rb(z, 0xF33C) == 0xC9) {
+          ctx->trap_callback(ctx->userdata);
+          fdc_counter++;
+          continue;
+        }
+      }
+    }
+
+    unsigned long cyc_before = z->cyc;
+    z80_step(z);
+    frame_cycles += z->cyc - cyc_before;
+
+    // Sync mapping registers immediately after port OUT changes them
+    if (z->mapping_regs_dirty) {
+      z->mapping_regs_dirty = false;
+      ctx->sync_mapping(ctx->userdata);
+    }
+
+    // Advance FDC state machine every fdc_pulse instructions
+    fdc_counter++;
+    if (fdc_counter >= fdc_pulse) {
+      fdc_counter = 0;
+      ctx->fdc_callback(ctx->userdata, z);
+    }
+
+    // HALT: signal caller
+    if (z->halted) {
+      ctx->frame_cycles = frame_cycles;
+      return 1;
+    }
+  }
+
+  ctx->frame_cycles = frame_cycles;
+  return ctx->should_run ? 0 : 2;
 }
 
 // outputs to stdout a debug trace of the emulator
@@ -1587,26 +1638,24 @@ void exec_opcode_ed(z80* const z, uint8_t opcode) {
   case 0x4D: ret(z); break; // reti
 
   case 0xA0: ldi(z); break; // ldi
-  case 0xB0: {
-    ldi(z);
-
-    if (get_bc(z) != 0) {
-      z->pc -= 2;
+  case 0xB0: { // ldir — fast-path: loop in C instead of re-decoding per byte
+    do {
+      ldi(z);
+      if (get_bc(z) == 0) break;
       z->cyc += 5;
-      z->mem_ptr = z->pc + 1;
-    }
-  } break; // ldir
+    } while (1);
+    z->mem_ptr = z->pc + 1;
+  } break;
 
   case 0xA8: ldd(z); break; // ldd
-  case 0xB8: {
-    ldd(z);
-
-    if (get_bc(z) != 0) {
-      z->pc -= 2;
+  case 0xB8: { // lddr — fast-path: loop in C instead of re-decoding per byte
+    do {
+      ldd(z);
+      if (get_bc(z) == 0) break;
       z->cyc += 5;
-      z->mem_ptr = z->pc + 1;
-    }
-  } break; // lddr
+    } while (1);
+    z->mem_ptr = z->pc + 1;
+  } break;
 
   case 0xA1: cpi(z); break; // cpi
   case 0xA9: cpd(z); break; // cpd
