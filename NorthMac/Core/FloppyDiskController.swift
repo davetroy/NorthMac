@@ -243,7 +243,7 @@ final class FloppyDiskController {
     }
 
     func startSectorRead() {
-        NSLog("FDC: startSectorRead sector=%d track=%d side=%d", floppy.sectorNum, floppy.trackNum, floppy.side)
+        //NSLog("FDC: startSectorRead sector=%d track=%d side=%d", floppy.sectorNum, floppy.trackNum, floppy.side)
         incrementSectorNum()
         var f = floppy
         f.fdcState = 100
@@ -254,7 +254,7 @@ final class FloppyDiskController {
     func storeSectorBuffer() {
         var f = floppy
         guard let diskData = f.diskData else {
-            NSLog("FDC: storeSectorBuffer - no disk data!")
+            //NSLog("FDC: storeSectorBuffer - no disk data!")
             return
         }
 
@@ -293,8 +293,8 @@ final class FloppyDiskController {
             f.crcVal = UInt8(k & 0xFF)
         }
         f.dataBuffer[513] = f.crcVal
-        NSLog("FDC: storeSector t=%d s=%d -> data[0..3]=%02X %02X %02X %02X crc=%02X",
-              f.trackNum, f.sectorNum, f.dataBuffer[0], f.dataBuffer[1], f.dataBuffer[2], f.dataBuffer[3], f.crcVal)
+//        NSLog("FDC: storeSector t=%d s=%d -> data[0..3]=%02X %02X %02X %02X crc=%02X",
+//              f.trackNum, f.sectorNum, f.dataBuffer[0], f.dataBuffer[1], f.dataBuffer[2], f.dataBuffer[3], f.crcVal)
         f.bytePtr = 0
         floppy = f
     }
