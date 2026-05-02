@@ -19,3 +19,8 @@ NorthMac/BuildInfo.swift
 # Built application
 *.app
 .gitnexus
+
+# Swift Package Manager (test harness only)
+.build/
+.swiftpm/
+Package.resolved
