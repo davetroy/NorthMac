@@ -3,6 +3,8 @@ import Foundation
 final class FloppyDiskController {
     struct Drive {
         var diskData: Data?
+        var sourceURL: URL?
+        var dirty: Bool = false
         var fileName: String = ""
         var maxTracks: Int = 35
         var maxSectors: Int = 700
@@ -11,7 +13,7 @@ final class FloppyDiskController {
         var sectorNum: Int = 9
         var side: Int = 0
         var motorOn: Bool = false
-        var writeProtect: Bool = false
+        var writeProtect: Bool = true   // opt-in: default to write-protected
         var track0: Bool = true
         var stepDirection: Int = 0  // 0=outward, 1=inward
         var stepPulse: Bool = false
@@ -53,13 +55,17 @@ final class FloppyDiskController {
     var cmdAckCounter: Int = 0
     var cmdAck: Bool = false
 
-    func mountDisk(drive: Int, data: Data) {
+    func mountDisk(drive: Int, url: URL, data: Data) {
         guard drive >= 0 && drive < 2 else { return }
         drives[drive].diskData = data
+        drives[drive].sourceURL = url
+        drives[drive].fileName = url.lastPathComponent
+        drives[drive].dirty = false
         drives[drive].maxTracks = 35
         drives[drive].maxSectors = 700
         drives[drive].sectorNum = 9
-        drives[drive].writeProtect = false
+        // writeProtect: default true; later PR will pull persisted user choice from UserDefaults
+        drives[drive].writeProtect = true
         drives[drive].trackNum = 0
         drives[drive].track0 = true
         drives[drive].bytePtr = 0
@@ -302,6 +308,13 @@ final class FloppyDiskController {
     func writeSectorToDisk() {
         var f = floppy
         guard f.diskData != nil else { return }
+        // Write-protect: silently drop the write but still reset bytePtr so the
+        // FDC state machine continues normally (matches behavior of a real WP'd disk).
+        guard !f.writeProtect else {
+            f.bytePtr = 0
+            floppy = f
+            return
+        }
 
         let storeSectNum: Int
         if f.side != 0 {
@@ -318,8 +331,24 @@ final class FloppyDiskController {
             }
         }
         f.diskData = data
+        f.dirty = true
         f.bytePtr = 0
         floppy = f
+    }
+
+    // MARK: - Write-back (stubs — implemented in PR 2)
+
+    /// Flush a single drive's modified image to its source URL if dirty and not write-protected.
+    /// No-op stub in this PR; PR 2 wires up atomic write + .bak.
+    @discardableResult
+    func flushIfDirty(drive: Int) -> Bool {
+        guard drive >= 0 && drive < drives.count else { return false }
+        return false
+    }
+
+    /// Flush both floppy drives. Called from EmulatorCore on app termination.
+    func flushAll() {
+        for i in 0..<drives.count { _ = flushIfDirty(drive: i) }
     }
 
     // FDC state machine - called from status register reads

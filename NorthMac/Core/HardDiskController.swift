@@ -33,6 +33,9 @@ final class HardDiskController {
     private var diskStore: UnsafeMutablePointer<UInt8>?
     private var diskStoreSize: Int = 0
     var fileName: String = ""
+    var sourceURL: URL?
+    var dirty: Bool = false
+    var writeProtect: Bool = true   // opt-in: default to write-protected
     var mounted: Bool { diskStore != nil }
 
     // Cache RAM (1024 bytes) — the HDC's onboard buffer
@@ -82,7 +85,7 @@ final class HardDiskController {
         }
     }
 
-    func mount(data: Data) {
+    func mount(url: URL, data: Data) {
         guard data.count >= 128,
               data[0] == 0x00, data[1] == 0xFF else {
             NSLog("HDC: Invalid NHD file (bad magic bytes)")
@@ -94,6 +97,12 @@ final class HardDiskController {
         diskStoreSize = data.count
         diskStore = .allocate(capacity: diskStoreSize)
         data.copyBytes(to: diskStore!, count: diskStoreSize)
+
+        sourceURL = url
+        fileName = url.lastPathComponent
+        dirty = false
+        // writeProtect: default true; later PR will pull persisted user choice from UserDefaults
+        writeProtect = true
 
         // Parse label
         maxSectors = Int(data[39]) + Int(data[40]) * 256
@@ -126,6 +135,8 @@ final class HardDiskController {
     func unmount() {
         freeDiskStore()
         fileName = ""
+        sourceURL = nil
+        dirty = false
         driveReady = false
         driveSelected = false
         seekComplete = false
@@ -459,6 +470,9 @@ final class HardDiskController {
 
     private func writeCachedSector() {
         guard syncOffset > 0, let store = diskStore else { return }
+        // Write-protect: drop the write to avoid mutating the in-memory image.
+        // Real hardware would set writeFault here; for now we silently no-op.
+        guard !writeProtect else { return }
 
         let physSector = Int(cacheRAM[syncOffset + 1]) & 0x0F
         let cylFactor = Int(cacheRAM[syncOffset + 1] & 0x30) << 4
@@ -478,5 +492,15 @@ final class HardDiskController {
                 store[fileOffset + j] = cacheRAM[src]
             }
         }
+        dirty = true
+    }
+
+    // MARK: - Write-back (stub — implemented in PR 2)
+
+    /// Flush the modified image to its source URL if dirty and not write-protected.
+    /// No-op stub in this PR; PR 2 wires up atomic write + .bak.
+    @discardableResult
+    func flushIfDirty() -> Bool {
+        return false
     }
 }
