@@ -22,9 +22,10 @@ NorthMac emulates the NorthStar Advantage Z80-based microcomputer — an all-in-
 - **Green, Amber, and White** phosphor colors
 - **Floppy disk controller** state machine supporting 175KB and 350KB NSI images
 - **Hard disk controller** supporting NHD images
+- **Disk write-back** with per-drive **Write Protect** toggle (defaults to on); modifications are atomically flushed back to the source `.NSI` / `.NHD` on app quit, with a one-time `.bak` next to the original
 - **Keyboard input** via macOS key events mapped to NorthStar scan codes
 - **Audio** with programmable speaker emulation
-- **Turbo mode** (Cmd+T) for maximum speed — nearly **200x faster** than original hardware
+- **Turbo mode** (Cmd+T) for maximum speed — over **200x faster** than original hardware
 - **Screenshots** (Cmd+S) saved to your preferred location
 
 ### What Boots
@@ -54,7 +55,7 @@ These can be found in various vintage computing archives and preservation sites.
 
 ## Performance
 
-The original NorthStar Advantage ran a Z80A at 4 MHz. On Apple Silicon, NorthMac's turbo mode reaches approximately **780 MHz** of emulated Z80 throughput — roughly **195x the speed of the original hardware**. At normal speed, the emulator idles at under 5% CPU usage thanks to HALT detection and frame-skip optimizations.
+The original NorthStar Advantage ran a Z80A at 4 MHz. On Apple Silicon, NorthMac's turbo mode reaches approximately **870 MHz** of emulated Z80 throughput — roughly **218x the speed of the original hardware**. At normal speed, the emulator idles at under 5% CPU usage thanks to HALT detection and frame-skip optimizations.
 
 Key optimizations: direct memory access from the C core (bypassing Swift callbacks), a tight C run loop (`emulator_run_frame`) that only calls back to Swift every 34 instructions for FDC timing, GPU-side video RAM transpose, and LDIR/LDDR block-transfer fast paths.
 
@@ -89,7 +90,20 @@ NorthMac/
   Bridge/
     z80-bridge.h              -- C bridging header
   z80.c / z80.h               -- Z80 CPU core (C)
+Tests/
+  NorthMacCoreTests/          -- XCTest suite for FDC + HDC
+Package.swift                 -- SPM target for `swift test` (Xcode app target unaffected)
 ```
+
+## Testing
+
+Disk-handling regressions are guarded by an SPM-based XCTest suite covering the floppy and hard disk controllers — write-protect gating, dirty-flag bookkeeping, atomic write-back, one-time `.bak` semantics, and NHD magic-byte validation:
+
+```sh
+swift test
+```
+
+24 tests, ~2 s on Apple Silicon. Each test runs in its own `NSTemporaryDirectory` subfolder, so the suite never touches your real disk images.
 
 ## Acknowledgments
 
