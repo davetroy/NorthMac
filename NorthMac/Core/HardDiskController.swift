@@ -101,8 +101,9 @@ final class HardDiskController {
         sourceURL = url
         fileName = url.lastPathComponent
         dirty = false
-        // writeProtect: default true; later PR will pull persisted user choice from UserDefaults
-        writeProtect = true
+        // writeProtect default true; PR 3 will add a UI toggle + UserDefaults persistence.
+        // Hidden debug override `debugAllowWrites` lets PR 2 be tested end-to-end without UI.
+        writeProtect = !UserDefaults.standard.bool(forKey: "debugAllowWrites")
 
         // Parse label
         maxSectors = Int(data[39]) + Int(data[40]) * 256
@@ -495,12 +496,41 @@ final class HardDiskController {
         dirty = true
     }
 
-    // MARK: - Write-back (stub — implemented in PR 2)
+    // MARK: - Write-back
 
     /// Flush the modified image to its source URL if dirty and not write-protected.
-    /// No-op stub in this PR; PR 2 wires up atomic write + .bak.
+    /// On first flush for a given file, creates a one-time `.bak` next to the original.
+    /// Atomic: `Data.write(.atomic)` writes via temp file + rename.
     @discardableResult
     func flushIfDirty() -> Bool {
-        return false
+        guard dirty, !writeProtect, let url = sourceURL, let store = diskStore else {
+            return false
+        }
+
+        let backupURL = url.appendingPathExtension("bak")
+        if !FileManager.default.fileExists(atPath: backupURL.path) {
+            do {
+                try FileManager.default.copyItem(at: url, to: backupURL)
+                NSLog("HDC: created backup at %@", backupURL.path)
+            } catch {
+                NSLog("HDC: backup failed for %@: %@ — aborting flush",
+                      url.path, error.localizedDescription)
+                return false
+            }
+        }
+
+        // bytesNoCopy avoids duplicating a multi-MB image just to write it.
+        // The Data is consumed immediately by write() and not retained.
+        let data = Data(bytesNoCopy: store, count: diskStoreSize, deallocator: .none)
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            NSLog("HDC: write failed for %@: %@", url.path, error.localizedDescription)
+            return false
+        }
+
+        dirty = false
+        NSLog("HDC: flushed %@ (%d bytes)", url.lastPathComponent, diskStoreSize)
+        return true
     }
 }

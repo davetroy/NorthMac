@@ -64,8 +64,10 @@ final class FloppyDiskController {
         drives[drive].maxTracks = 35
         drives[drive].maxSectors = 700
         drives[drive].sectorNum = 9
-        // writeProtect: default true; later PR will pull persisted user choice from UserDefaults
-        drives[drive].writeProtect = true
+        // writeProtect default true; PR 3 will add a UI toggle + UserDefaults persistence.
+        // Hidden debug override `debugAllowWrites` lets PR 2 be tested end-to-end without UI:
+        //   defaults write com.davetroy.NorthMac debugAllowWrites -bool true
+        drives[drive].writeProtect = !UserDefaults.standard.bool(forKey: "debugAllowWrites")
         drives[drive].trackNum = 0
         drives[drive].track0 = true
         drives[drive].bytePtr = 0
@@ -336,14 +338,45 @@ final class FloppyDiskController {
         floppy = f
     }
 
-    // MARK: - Write-back (stubs — implemented in PR 2)
+    // MARK: - Write-back
 
     /// Flush a single drive's modified image to its source URL if dirty and not write-protected.
-    /// No-op stub in this PR; PR 2 wires up atomic write + .bak.
+    /// On first flush for a given file, creates a one-time `.bak` next to the original.
+    /// Atomic: `Data.write(.atomic)` writes via temp file + rename, so a crash mid-flush
+    /// leaves the original intact.
     @discardableResult
     func flushIfDirty(drive: Int) -> Bool {
         guard drive >= 0 && drive < drives.count else { return false }
-        return false
+        let f = drives[drive]
+        guard f.dirty, !f.writeProtect, let url = f.sourceURL, let data = f.diskData else {
+            return false
+        }
+
+        // One-time backup: never overwrite an image without a `.bak` next to it.
+        // If the backup copy fails, abort the flush — preserving the original is more
+        // important than persisting changes.
+        let backupURL = url.appendingPathExtension("bak")
+        if !FileManager.default.fileExists(atPath: backupURL.path) {
+            do {
+                try FileManager.default.copyItem(at: url, to: backupURL)
+                NSLog("FDC: created backup at %@", backupURL.path)
+            } catch {
+                NSLog("FDC: backup failed for %@: %@ — aborting flush",
+                      url.path, error.localizedDescription)
+                return false
+            }
+        }
+
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            NSLog("FDC: write failed for %@: %@", url.path, error.localizedDescription)
+            return false
+        }
+
+        drives[drive].dirty = false
+        NSLog("FDC: flushed drive %d to %@ (%d bytes)", drive, url.lastPathComponent, data.count)
+        return true
     }
 
     /// Flush both floppy drives. Called from EmulatorCore on app termination.
