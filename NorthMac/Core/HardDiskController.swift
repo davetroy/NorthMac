@@ -85,7 +85,7 @@ final class HardDiskController {
         }
     }
 
-    func mount(url: URL, data: Data) {
+    func mount(url: URL, data: Data, writeProtect: Bool) {
         guard data.count >= 128,
               data[0] == 0x00, data[1] == 0xFF else {
             NSLog("HDC: Invalid NHD file (bad magic bytes)")
@@ -101,9 +101,7 @@ final class HardDiskController {
         sourceURL = url
         fileName = url.lastPathComponent
         dirty = false
-        // writeProtect default true; PR 3 will add a UI toggle + UserDefaults persistence.
-        // Hidden debug override `debugAllowWrites` lets PR 2 be tested end-to-end without UI.
-        writeProtect = !UserDefaults.standard.bool(forKey: "debugAllowWrites")
+        self.writeProtect = writeProtect
 
         // Parse label
         maxSectors = Int(data[39]) + Int(data[40]) * 256
