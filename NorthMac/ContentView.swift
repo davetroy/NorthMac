@@ -191,6 +191,7 @@ struct ContentView: View {
             Button("Disks") { showDiskControls.toggle() }
                 .popover(isPresented: $showDiskControls) {
                     DiskControlsView(
+                        emulator: emulator,
                         selectedDisk1: $selectedDisk1,
                         selectedDisk2: $selectedDisk2,
                         selectedHD: $selectedHD,
@@ -328,6 +329,7 @@ struct ContentView: View {
 }
 
 struct DiskControlsView: View {
+    @ObservedObject var emulator: EmulatorCore
     @Binding var selectedDisk1: DiskEntry?
     @Binding var selectedDisk2: DiskEntry?
     @Binding var selectedHD: DiskEntry?
@@ -354,6 +356,12 @@ struct DiskControlsView: View {
                 if let disk = disk { onMountFloppy(disk, 0) }
             }
 
+            writeProtectToggle(label: "Write Protect Drive 1",
+                               isOn: emulator.fdc.drives[0].writeProtect,
+                               enabled: emulator.fdc.drives[0].sourceURL != nil) { wp in
+                emulator.setDriveWriteProtect(drive: 0, wp)
+            }
+
             Picker("Drive 2", selection: $selectedDisk2) {
                 Text("None").tag(nil as DiskEntry?)
                 ForEach(diskCategories, id: \.0) { category, disks in
@@ -368,6 +376,12 @@ struct DiskControlsView: View {
                 if let disk = disk { onMountFloppy(disk, 1) }
             }
 
+            writeProtectToggle(label: "Write Protect Drive 2",
+                               isOn: emulator.fdc.drives[1].writeProtect,
+                               enabled: emulator.fdc.drives[1].sourceURL != nil) { wp in
+                emulator.setDriveWriteProtect(drive: 1, wp)
+            }
+
             Divider()
 
             Picker("Hard Disk", selection: $selectedHD) {
@@ -379,9 +393,24 @@ struct DiskControlsView: View {
             .onChange(of: selectedHD) { _, hd in
                 if let hd = hd { onMountHD(hd) }
             }
+
+            writeProtectToggle(label: "Write Protect Hard Disk",
+                               isOn: emulator.hdc.writeProtect,
+                               enabled: emulator.hdc.sourceURL != nil) { wp in
+                emulator.setHardDiskWriteProtect(wp)
+            }
         }
         .padding()
         .frame(width: 300)
+    }
+
+    @ViewBuilder
+    private func writeProtectToggle(label: String, isOn: Bool, enabled: Bool,
+                                    onChange: @escaping (Bool) -> Void) -> some View {
+        Toggle(label, isOn: Binding(get: { isOn }, set: { onChange($0) }))
+            .toggleStyle(.checkbox)
+            .controlSize(.small)
+            .disabled(!enabled)
     }
 }
 

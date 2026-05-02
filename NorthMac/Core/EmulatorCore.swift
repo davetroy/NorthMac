@@ -122,28 +122,66 @@ final class EmulatorCore: ObservableObject {
 
     func mountDisk(url: URL, drive: Int) {
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
-            print("ERROR: Could not load disk image from \(url)")
+            NSLog("ERROR: Could not load disk image from %@", url.path)
             return
         }
-        fdc.mountDisk(drive: drive, url: url, data: data)
-        print("Disk mounted on drive \(drive + 1): \(url.lastPathComponent) (\(data.count) bytes)")
+        let wp = Self.persistedWriteProtect(for: url)
+        fdc.mountDisk(drive: drive, url: url, data: data, writeProtect: wp)
+        NSLog("Disk mounted on drive %d: %@ (%d bytes, WP=%@)",
+              drive + 1, url.lastPathComponent, data.count, wp ? "true" : "false")
+        DispatchQueue.main.async { [weak self] in self?.objectWillChange.send() }
     }
 
     func mountHardDisk(url: URL) {
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
-            print("ERROR: Could not load hard disk image from \(url)")
+            NSLog("ERROR: Could not load hard disk image from %@", url.path)
             return
         }
-        hdc.mount(url: url, data: data)
-        print("Hard disk mounted: \(url.lastPathComponent) (\(data.count / 1024)K)")
+        let wp = Self.persistedWriteProtect(for: url)
+        hdc.mount(url: url, data: data, writeProtect: wp)
+        NSLog("Hard disk mounted: %@ (%dK, WP=%@)",
+              url.lastPathComponent, data.count / 1024, wp ? "true" : "false")
+        DispatchQueue.main.async { [weak self] in self?.objectWillChange.send() }
     }
 
-    /// Flush any dirty mounted images to disk. Called from the app's
-    /// NSApplicationWillTerminate observer (see NorthMacApp). PR 1 stubs
-    /// the controller-level flushes; PR 2 implements them.
+    /// Flush any dirty mounted images to disk. Called from the
+    /// NSApplicationWillTerminate observer installed in init.
     func flushDirtyImagesOnQuit() {
         fdc.flushAll()
         hdc.flushIfDirty()
+    }
+
+    // MARK: - Per-drive write-protect
+
+    /// UserDefaults key for the persisted write-protect choice for a given image URL.
+    private static func writeProtectKey(for url: URL) -> String {
+        "writeProtect:" + url.path
+    }
+
+    /// Read the user's persisted WP choice for this image. Defaults to `true`
+    /// (write-protected / opt-in) on first encounter.
+    static func persistedWriteProtect(for url: URL) -> Bool {
+        if let v = UserDefaults.standard.object(forKey: writeProtectKey(for: url)) as? Bool {
+            return v
+        }
+        return true
+    }
+
+    func setDriveWriteProtect(drive: Int, _ wp: Bool) {
+        guard drive >= 0 && drive < fdc.drives.count else { return }
+        fdc.drives[drive].writeProtect = wp
+        if let url = fdc.drives[drive].sourceURL {
+            UserDefaults.standard.set(wp, forKey: Self.writeProtectKey(for: url))
+        }
+        objectWillChange.send()
+    }
+
+    func setHardDiskWriteProtect(_ wp: Bool) {
+        hdc.writeProtect = wp
+        if let url = hdc.sourceURL {
+            UserDefaults.standard.set(wp, forKey: Self.writeProtectKey(for: url))
+        }
+        objectWillChange.send()
     }
 
     /// Sync CPU's direct-memory mapping registers from MemorySystem

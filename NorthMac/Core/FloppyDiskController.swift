@@ -55,7 +55,7 @@ final class FloppyDiskController {
     var cmdAckCounter: Int = 0
     var cmdAck: Bool = false
 
-    func mountDisk(drive: Int, url: URL, data: Data) {
+    func mountDisk(drive: Int, url: URL, data: Data, writeProtect: Bool) {
         guard drive >= 0 && drive < 2 else { return }
         drives[drive].diskData = data
         drives[drive].sourceURL = url
@@ -64,10 +64,7 @@ final class FloppyDiskController {
         drives[drive].maxTracks = 35
         drives[drive].maxSectors = 700
         drives[drive].sectorNum = 9
-        // writeProtect default true; PR 3 will add a UI toggle + UserDefaults persistence.
-        // Hidden debug override `debugAllowWrites` lets PR 2 be tested end-to-end without UI:
-        //   defaults write com.davetroy.NorthMac debugAllowWrites -bool true
-        drives[drive].writeProtect = !UserDefaults.standard.bool(forKey: "debugAllowWrites")
+        drives[drive].writeProtect = writeProtect
         drives[drive].trackNum = 0
         drives[drive].track0 = true
         drives[drive].bytePtr = 0
