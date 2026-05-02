@@ -54,6 +54,16 @@ final class EmulatorCore: ObservableObject {
         io.emulator = self
         fdc.onBeep = { [weak self] in self?.audio.beep() }
         setupCPU()
+
+        // Flush any dirty mounted disk images when the app is about to terminate.
+        // PR 2 implements the actual write; PR 1 wires the lifecycle hook.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.flushDirtyImagesOnQuit()
+        }
     }
 
     private func setupCPU() {
@@ -115,7 +125,7 @@ final class EmulatorCore: ObservableObject {
             print("ERROR: Could not load disk image from \(url)")
             return
         }
-        fdc.mountDisk(drive: drive, data: data)
+        fdc.mountDisk(drive: drive, url: url, data: data)
         print("Disk mounted on drive \(drive + 1): \(url.lastPathComponent) (\(data.count) bytes)")
     }
 
@@ -124,9 +134,16 @@ final class EmulatorCore: ObservableObject {
             print("ERROR: Could not load hard disk image from \(url)")
             return
         }
-        hdc.mount(data: data)
-        hdc.fileName = url.lastPathComponent
+        hdc.mount(url: url, data: data)
         print("Hard disk mounted: \(url.lastPathComponent) (\(data.count / 1024)K)")
+    }
+
+    /// Flush any dirty mounted images to disk. Called from the app's
+    /// NSApplicationWillTerminate observer (see NorthMacApp). PR 1 stubs
+    /// the controller-level flushes; PR 2 implements them.
+    func flushDirtyImagesOnQuit() {
+        fdc.flushAll()
+        hdc.flushIfDirty()
     }
 
     /// Sync CPU's direct-memory mapping registers from MemorySystem

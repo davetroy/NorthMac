@@ -18,3 +18,4 @@ NorthMac/BuildInfo.swift
 
 # Built application
 *.app
+.gitnexus
