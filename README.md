@@ -68,6 +68,30 @@ Key optimizations: direct memory access from the C core (bypassing Swift callbac
 | Cmd+Shift+R | Reset (cold boot) |
 | Cmd+S | Save Screenshot |
 
+## Command-Line Launch
+
+NorthMac can be launched from the terminal with disk images supplied as
+arguments — handy for booting straight into a specific configuration:
+
+```
+northmac disk1.nsi [disk2.nsi] [hd.nhd]
+```
+
+- The first `.nsi` mounts to floppy drive 1, the second to drive 2.
+- The first `.nhd` mounts as the hard disk.
+- Relative paths are resolved against the shell's current directory.
+- These mounts are **one-shot**: they do not overwrite the GUI's last-used
+  selection, so the next launch (without args) restores your saved session.
+
+A wrapper script lives at `bin/northmac`. Symlink it onto your `$PATH`:
+
+```
+ln -s "$(pwd)/bin/northmac" /usr/local/bin/northmac
+```
+
+The wrapper expects the app at `/Applications/NorthMac.app`; override with
+`NORTHMAC_APP=/path/to/NorthMac.app northmac …`.
+
 ## Architecture
 
 ```

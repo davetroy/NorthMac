@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var selectedDisk1: DiskEntry?
     @State private var selectedDisk2: DiskEntry?
     @State private var selectedHD: DiskEntry?
+    @State private var cliLaunchActive = false
     @State private var showDiskControls = false
     @State private var showCRTControls = false
     @State private var diskWarning: String?
@@ -79,45 +80,65 @@ struct ContentView: View {
                 availableDisks = cache.availableDisks
                 availableHDs = cache.availableHDs
 
-                // Restore selections from last session (UI state only — no disk I/O)
-                let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
-                let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
-                let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
+                let cli = CLILaunchArgs.parse()
+                cliLaunchActive = (cli != nil)
 
-                let disk1 = availableDisks.first(where: { $0.name == lastDisk1 })
-                    ?? availableDisks.first(where: { $0.name == "advf2_cpm120_wm" })
-                    ?? availableDisks.first(where: { $0.validation.isValid })
-                let disk2 = lastDisk2.isEmpty ? nil : availableDisks.first(where: { $0.name == lastDisk2 })
-                let hd = lastHD.isEmpty ? nil : availableHDs.first(where: { $0.name == lastHD })
+                // Determine what to mount: CLI args win for this session; otherwise restore last session.
+                let mount0URL: URL?
+                let mount1URL: URL?
+                let mountHDURL: URL?
 
-                if let disk1 = disk1 { selectedDisk1 = disk1 }
-                if let disk2 = disk2 { selectedDisk2 = disk2 }
-                if let hd = hd { selectedHD = hd }
+                if let cli = cli {
+                    mount0URL = cli.floppy0
+                    mount1URL = cli.floppy1
+                    mountHDURL = cli.hardDisk
 
-                // Notify user about missing resources
-                let romAvailable = cache.bootROMData != nil
-                var missing: [String] = []
-                if !romAvailable {
-                    missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
+                    // Reflect catalog matches in the GUI pickers when possible.
+                    selectedDisk1 = cli.floppy0.flatMap { url in catalogMatch(url, in: availableDisks) }
+                    selectedDisk2 = cli.floppy1.flatMap { url in catalogMatch(url, in: availableDisks) }
+                    selectedHD = cli.hardDisk.flatMap { url in catalogMatch(url, in: availableHDs) }
+                } else {
+                    let lastDisk1 = UserDefaults.standard.string(forKey: "lastDisk1") ?? ""
+                    let lastDisk2 = UserDefaults.standard.string(forKey: "lastDisk2") ?? ""
+                    let lastHD = UserDefaults.standard.string(forKey: "lastHD") ?? ""
+
+                    let disk1 = availableDisks.first(where: { $0.name == lastDisk1 })
+                        ?? availableDisks.first(where: { $0.name == "advf2_cpm120_wm" })
+                        ?? availableDisks.first(where: { $0.validation.isValid })
+                    let disk2 = lastDisk2.isEmpty ? nil : availableDisks.first(where: { $0.name == lastDisk2 })
+                    let hd = lastHD.isEmpty ? nil : availableHDs.first(where: { $0.name == lastHD })
+
+                    if let disk1 = disk1 { selectedDisk1 = disk1 }
+                    if let disk2 = disk2 { selectedDisk2 = disk2 }
+                    if let hd = hd { selectedHD = hd }
+
+                    mount0URL = disk1?.url
+                    mount1URL = disk2?.url
+                    mountHDURL = hd?.url
+
+                    // Setup warning only matters in restore mode — CLI users supplied their own files.
+                    let romAvailable = cache.bootROMData != nil
+                    var missing: [String] = []
+                    if !romAvailable {
+                        missing.append("• Boot ROM (AdvantageBootRom.bin) — place in Resources/")
+                    }
+                    if availableDisks.isEmpty {
+                        missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
+                    }
+                    if !missing.isEmpty {
+                        setupWarning = "The following resources are missing:\n\n"
+                            + missing.joined(separator: "\n")
+                            + "\n\nSee README.md for details on where to find these files."
+                        showSetupWarning = true
+                    }
                 }
-                if availableDisks.isEmpty {
-                    missing.append("• Floppy disk images (.NSI) — place in Disk Images/Bootable/")
-                }
-                if !missing.isEmpty {
-                    setupWarning = "The following resources are missing:\n\n"
-                        + missing.joined(separator: "\n")
-                        + "\n\nSee README.md for details on where to find these files."
-                    showSetupWarning = true
-                }
 
-                // Load boot ROM and mount only the previously-selected disks.
-                // Mounting is lazy — disks not selected are never read from disk.
                 let emulator = self.emulator
                 DispatchQueue.global(qos: .userInitiated).async {
                     emulator.loadBootROM()
-                    if let disk1 = disk1 { emulator.mountDisk(url: disk1.url, drive: 0) }
-                    if let disk2 = disk2 { emulator.mountDisk(url: disk2.url, drive: 1) }
-                    if let hd = hd { emulator.mountHardDisk(url: hd.url) }
+                    if let url = mount0URL { emulator.mountDisk(url: url, drive: 0) }
+                    if let url = mount1URL { emulator.mountDisk(url: url, drive: 1) }
+                    if let url = mountHDURL { emulator.mountHardDisk(url: url) }
                     DispatchQueue.main.async {
                         emulator.start()
                     }
@@ -159,9 +180,17 @@ struct ContentView: View {
         ud.set(curvatureIntensity, forKey: "curvatureIntensity")
         ud.set(screenGlowIntensity, forKey: "screenGlowIntensity")
         ud.set(emulator.turboMode, forKey: "turboMode")
-        ud.set(selectedDisk1?.name ?? "", forKey: "lastDisk1")
-        ud.set(selectedDisk2?.name ?? "", forKey: "lastDisk2")
-        ud.set(selectedHD?.name ?? "", forKey: "lastHD")
+        // CLI launches are one-shot — don't overwrite the user's GUI-selected disk history.
+        if !cliLaunchActive {
+            ud.set(selectedDisk1?.name ?? "", forKey: "lastDisk1")
+            ud.set(selectedDisk2?.name ?? "", forKey: "lastDisk2")
+            ud.set(selectedHD?.name ?? "", forKey: "lastHD")
+        }
+    }
+
+    private func catalogMatch(_ url: URL, in entries: [DiskEntry]) -> DiskEntry? {
+        let target = url.standardizedFileURL.path
+        return entries.first { $0.url.standardizedFileURL.path == target }
     }
 
     private func openDiskPanel(drive: Int) {

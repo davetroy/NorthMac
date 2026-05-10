@@ -1,0 +1,40 @@
+#!/bin/bash
+# northmac — launch the NorthMac.app bundle from the command line, passing
+# disk-image arguments through to the emulator.
+#
+# Usage: northmac [disk1.nsi [disk2.nsi]] [hd.nhd]
+#
+# Symlink this into your $PATH:
+#   ln -s "$(pwd)/bin/northmac" /usr/local/bin/northmac
+#
+# Override the bundle location by setting NORTHMAC_APP, e.g.:
+#   NORTHMAC_APP=~/Build/NorthMac.app northmac disk.nsi
+
+set -euo pipefail
+
+APP="${NORTHMAC_APP:-/Applications/NorthMac.app}"
+BIN="$APP/Contents/MacOS/NorthMac"
+
+if [[ ! -x "$BIN" ]]; then
+    echo "northmac: $BIN not found or not executable." >&2
+    echo "Build & install with: xcodebuild -project NorthMac.xcodeproj -scheme NorthMac -configuration Release build" >&2
+    echo "Then copy the built .app into /Applications, or set NORTHMAC_APP=/path/to/NorthMac.app" >&2
+    exit 1
+fi
+
+# Resolve each file argument to an absolute path so the app finds them
+# regardless of its own working directory. Non-file flags (-foo) pass through.
+args=()
+for a in "$@"; do
+    if [[ "$a" == -* ]]; then
+        args+=("$a")
+    elif [[ -e "$a" ]]; then
+        # macOS bash 3.x has no realpath; use python to canonicalize.
+        args+=("$(/usr/bin/python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$a")")
+    else
+        echo "northmac: file not found: $a" >&2
+        exit 1
+    fi
+done
+
+exec "$BIN" "${args[@]}"

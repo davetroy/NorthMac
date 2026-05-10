@@ -10,6 +10,7 @@
 		A10000190000000000000019 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000190000000000000019 /* BuildInfo.swift */; };
 		A10000010000000000000001 /* NorthMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* NorthMacApp.swift */; };
 		A10000020000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000020000000000000002 /* ContentView.swift */; };
+		A10000200000000000000020 /* CLILaunchArgs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000200000000000000020 /* CLILaunchArgs.swift */; };
 		A10000030000000000000003 /* EmulatorCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000030000000000000003 /* EmulatorCore.swift */; };
 		A10000040000000000000004 /* MemorySystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000040000000000000004 /* MemorySystem.swift */; };
 		A10000050000000000000005 /* IOSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000050000000000000005 /* IOSystem.swift */; };
@@ -30,6 +31,7 @@
 		A20000190000000000000019 /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		A20000010000000000000001 /* NorthMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NorthMacApp.swift; sourceTree = "<group>"; };
 		A20000020000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A20000200000000000000020 /* CLILaunchArgs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLILaunchArgs.swift; sourceTree = "<group>"; };
 		A20000030000000000000003 /* EmulatorCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmulatorCore.swift; sourceTree = "<group>"; };
 		A20000040000000000000004 /* MemorySystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemorySystem.swift; sourceTree = "<group>"; };
 		A20000050000000000000005 /* IOSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSystem.swift; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 				A20000010000000000000001 /* NorthMacApp.swift */,
 				A20000190000000000000019 /* BuildInfo.swift */,
 				A20000020000000000000002 /* ContentView.swift */,
+				A20000200000000000000020 /* CLILaunchArgs.swift */,
 				A20000110000000000000011 /* z80.c */,
 				A20000130000000000000013 /* z80.h */,
 				A50000030000000000000003 /* Core */,
@@ -213,6 +216,7 @@
 				A10000010000000000000001 /* NorthMacApp.swift in Sources */,
 				A10000190000000000000019 /* BuildInfo.swift in Sources */,
 				A10000020000000000000002 /* ContentView.swift in Sources */,
+				A10000200000000000000020 /* CLILaunchArgs.swift in Sources */,
 				A10000030000000000000003 /* EmulatorCore.swift in Sources */,
 				A10000040000000000000004 /* MemorySystem.swift in Sources */,
 				A10000050000000000000005 /* IOSystem.swift in Sources */,
