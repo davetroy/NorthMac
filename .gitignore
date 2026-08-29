@@ -24,3 +24,9 @@ NorthMac/BuildInfo.swift
 .build/
 .swiftpm/
 Package.resolved
+.DS_Store
+build/
+.claude/
+*.bak
+greenfield/test/*.raw
+greenfield/*.bin

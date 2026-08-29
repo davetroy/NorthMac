@@ -24,14 +24,23 @@ final class AudioSystem {
     private let beepFrequency: Double = 1920.0  // NorthStar boot beep ~1920Hz
 
     // Speaker toggle tracking for frequency-derived tone generation
-    private var lastToggleSample: Int = 0
-    private var currentSample: Int = 0
+    private var lastToggleTime: UInt64 = 0
+    private var lastToggleCycles: UInt64 = 0
+    private var lpState: Float = 0.0
     private var speakerToggleActive: Bool = false
     private var toggleHalfPeriodSamples: Int = 0
+    private var toggleHalfPeriodF: Double = 0.0
+    private var sqPhaseF: Double = 0.0
+    private var timebaseNumer: UInt64 = 1
+    private var timebaseDenom: UInt64 = 1
+
+    // Square-wave synthesis state (render thread only)
+    private var sqPhase: Int = 0
+    private var sqPolarity: Float = 1.0
 
     // Decay: stop producing tone after ~50ms of no toggles
     private var samplesSinceLastToggle: Int = 0
-    private let decayThreshold: Int = 2205  // ~50ms at 44100Hz
+    private let decayThreshold: Int = 700  // ~16ms: sustains tones, trims tails
 
     // Lock for thread-safe state access
     private let lock = NSLock()
@@ -41,6 +50,10 @@ final class AudioSystem {
     private var lastAudioActivity: UInt64 = mach_absolute_time()
 
     init() {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        timebaseNumer = UInt64(info.numer)
+        timebaseDenom = UInt64(info.denom)
         setupAudioEngine()
     }
 
@@ -58,8 +71,8 @@ final class AudioSystem {
             var beepPhase = self.beepPhase
             let toggleActive = self.speakerToggleActive
             let halfPeriod = self.toggleHalfPeriodSamples
+            let halfPeriodF = self.toggleHalfPeriodF
             var samplesSinceToggle = self.samplesSinceLastToggle
-            let speakerHigh = self.speakerState
             self.lock.unlock()
 
             let beepOmega = 2.0 * Double.pi * self.beepFrequency / self.sampleRate
@@ -90,15 +103,24 @@ final class AudioSystem {
                         beepLeft -= 1
                     }
 
-                    // Programmable speaker tone (I/O control register bit 6 toggling)
+                    // Programmable speaker tone (I/O control register bit 6 toggling):
+                    // synthesize a square wave at the measured toggle rate.
                     if toggleActive && halfPeriod > 0 && samplesSinceToggle < self.decayThreshold {
-                        // Reconstruct square wave from toggle half-period
-                        let amplitude: Float = speakerHigh ? 0.30 : -0.30
-                        sample += amplitude
+                        sample += 0.30 * self.sqPolarity
+                        self.sqPhaseF += 1.0
+                        if self.sqPhaseF >= halfPeriodF {
+                            self.sqPhaseF -= halfPeriodF   // fractional carry: exact pitch
+                            if self.sqPhaseF >= halfPeriodF {
+                                self.sqPhaseF = 0          // period just shrank (sweep):
+                            }                              // resync instead of thrashing
+                            self.sqPolarity = -self.sqPolarity
+                        }
                     }
 
                     samplesSinceToggle += 1
-                    data[frame] = sample
+                    // one-pole lowpass ~ speaker-cone warmth
+                    self.lpState += 0.45 * (sample - self.lpState)
+                    data[frame] = self.lpState
                 }
             }
 
@@ -137,18 +159,24 @@ final class AudioSystem {
     /// Handle speaker data toggle from I/O control register bit 6.
     /// Called from the emulator thread every time port 0xF8 is written.
     /// The Z80 software controls tone frequency by varying the toggle rate.
-    func speakerToggle(high: Bool) {
+    func speakerToggle(high: Bool, cycles: UInt64 = 0) {
         lock.lock()
         let wasHigh = speakerState
         speakerState = high
 
         if wasHigh != high {
-            // Measure half-period in audio samples
-            let now = currentSample
-            if lastToggleSample > 0 {
-                toggleHalfPeriodSamples = now - lastToggleSample
+            // Measure the CPU cycles between toggles and convert to audio
+            // samples (4 MHz / 44100 Hz = 90.7 cycles per sample) — exact,
+            // jitter-free pitch regardless of host thread scheduling.
+            if cycles > lastToggleCycles && lastToggleCycles > 0 {
+                let dc = cycles - lastToggleCycles
+                let hpF = Double(dc) * (sampleRate / 4_000_000.0)
+                if hpF >= 1.5 && hpF <= 4000.0 {
+                    toggleHalfPeriodSamples = Int(hpF)
+                    toggleHalfPeriodF = hpF
+                }
             }
-            lastToggleSample = now
+            lastToggleCycles = cycles
             samplesSinceLastToggle = 0
             speakerToggleActive = true
             lastAudioActivity = mach_absolute_time()
@@ -161,7 +189,6 @@ final class AudioSystem {
             }
         }
 
-        currentSample += 1
         lock.unlock()
     }
 
@@ -198,12 +225,9 @@ final class AudioSystem {
         }
     }
 
-    /// Called periodically from emulator to sync sample counter with real time
+    /// Half-period is now measured from wall-clock toggle spacing; the old
+    /// cycle-derived sample counter is gone. Kept as a no-op for callers.
     func syncSampleCounter(cpuCycles: UInt) {
-        lock.lock()
-        // 4MHz CPU / 44100Hz audio ≈ 90.7 cycles per audio sample
-        currentSample = Int(cpuCycles / 91)
-        lock.unlock()
     }
 
     func shutdown() {

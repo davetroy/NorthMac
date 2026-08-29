@@ -58,10 +58,18 @@ typedef struct {
   bool trap_active;
   uint16_t trap_pc1;        // 0xF33C
   uint16_t trap_pc2;        // 0xF33F
+  // Boot trace: fires once when PC == boot_trace_pc, then auto-disarms by
+  // setting boot_trace_pc = 0xFFFF. Used to dump CPU state at a known boot
+  // decision point (e.g. PC=0x018E, right before JP (HL) in the boot ROM).
+  // Set boot_trace_pc to 0xFFFF to disable. Set boot_trace_armed=false to
+  // prevent firing without changing PC.
+  uint16_t boot_trace_pc;
+  bool boot_trace_armed;
   // Callbacks into Swift
   void (*fdc_callback)(void* userdata, z80* cpu);  // advance FDC + check interrupts
   void (*trap_callback)(void* userdata);            // handle MED3C trap
   void (*sync_mapping)(void* userdata);             // sync mapping registers
+  void (*boot_trace_callback)(void* userdata);     // boot diagnostic dump
   void* userdata;
 } frame_context;
 

@@ -811,6 +811,15 @@ int emulator_run_frame(frame_context* ctx) {
   unsigned long frame_cycles = 0;
 
   while (frame_cycles < target && ctx->should_run) {
+    // Boot trace: one-shot diagnostic dump at a configured PC.
+    // Disarms itself after firing so it can't loop. PC=0xFFFF means disabled.
+    if (ctx->boot_trace_armed && z->pc == ctx->boot_trace_pc) {
+      ctx->boot_trace_armed = false;
+      if (ctx->boot_trace_callback) {
+        ctx->boot_trace_callback(ctx->userdata);
+      }
+    }
+
     // MED3C trap check
     if (ctx->trap_active) {
       uint16_t pc = z->pc;

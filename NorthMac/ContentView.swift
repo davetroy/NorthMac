@@ -92,6 +92,7 @@ struct ContentView: View {
                     mount0URL = cli.floppy0
                     mount1URL = cli.floppy1
                     mountHDURL = cli.hardDisk
+                    emulator.autoEnterEnabled = cli.autoEnter
 
                     // Reflect catalog matches in the GUI pickers when possible.
                     selectedDisk1 = cli.floppy0.flatMap { url in catalogMatch(url, in: availableDisks) }

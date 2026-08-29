@@ -16,6 +16,9 @@ final class EmulatorCore: ObservableObject {
     let audio = AudioSystem()
 
     private var cpu = z80()
+
+    /// Current CPU T-state count — timing reference for cycle-accurate audio.
+    var cpuCycles: UInt64 { UInt64(cpu.cyc) }
     private var emulatorThread: Thread?
     private var shouldRun = false
 
@@ -196,6 +199,79 @@ final class EmulatorCore: ObservableObject {
 
     private var hasBooted = false
 
+    /// One-shot boot-trace arm flag. Set to true on cold-boot init and after
+    /// `primeBootTrace()`. The C run loop consumes this on first PC match at
+    /// 0x018E (the JP (HL) in the boot ROM, right after the patched signature
+    /// check) and the boot_trace_callback dumps state. Auto-clears in C.
+    private var bootTraceArmed: Bool = true
+
+    /// Re-arm the boot trace. Call before a fresh boot (e.g. after reset) if
+    /// you want to capture a second dump.
+    func primeBootTrace() {
+        bootTraceArmed = true
+    }
+
+    /// Dump CPU + memory + stack state at the boot-trace fire point. Writes
+    /// to NSLog and /tmp/northmac_boot_trace.txt so the user can capture
+    /// regardless of where Console.app is filtering.
+    func dumpBootTrace() {
+        let hl = UInt16(cpu.h) << 8 | UInt16(cpu.l)
+        let de = UInt16(cpu.d) << 8 | UInt16(cpu.e)
+        let bc = UInt16(cpu.b) << 8 | UInt16(cpu.c)
+        let byteAtHL = memory.readByte(hl)
+
+        // 32 bytes around HL (16 before, 16 after) so we can see the entry
+        // instruction in context. Wrap-safe with Int math.
+        var contextHex = ""
+        let startAddr = Int(hl) - 8
+        for i in 0..<32 {
+            let a = UInt16((startAddr + i) & 0xFFFF)
+            let b = memory.readByte(a)
+            if i == 8 { contextHex += "[" }
+            contextHex += String(format: "%02X", b)
+            if i == 8 { contextHex += "]" }
+            if i < 31 { contextHex += " " }
+        }
+
+        // Stack top 16 bytes (where POP HL would pull from)
+        var stackHex = ""
+        for i in 0..<16 {
+            let a = cpu.sp &+ UInt16(i)
+            stackHex += String(format: "%02X ", memory.readByte(a))
+        }
+
+        let mountedDisks = fdc.drives.enumerated().map { (idx, d) -> String in
+            let name = d.fileName.isEmpty ? "(none)" : d.fileName
+            let size = d.diskData?.count ?? 0
+            // Re-detect MED3C inline since hasMED3C isn't stored on the drive.
+            let sig: [UInt8] = [0xED, 0x73, 0x7A, 0xFD]
+            var hasMed3c = false
+            if let data = d.diskData, data.count >= sig.count {
+                hasMed3c = data.range(of: Data(sig)) != nil
+            }
+            return "  Drive \(idx): \(name) (\(size) bytes, MED3C=\(hasMed3c))"
+        }.joined(separator: "\n")
+
+        let report = """
+        === NorthMac Boot Trace (PC=0x018E, just before JP (HL)) ===
+        HL=\(String(format: "%04X", hl)) byte_at_HL=\(String(format: "%02X", byteAtHL))
+        AF=\(String(format: "%02X__", cpu.a)) BC=\(String(format: "%04X", bc)) DE=\(String(format: "%04X", de)) SP=\(String(format: "%04X", cpu.sp))
+        IX=\(String(format: "%04X", cpu.ix)) IY=\(String(format: "%04X", cpu.iy))
+        Memory near HL (HL marked with brackets):
+          \(String(format: "%04X", UInt16((Int(hl) - 8) & 0xFFFF))): \(contextHex)
+        Stack top (SP=\(String(format: "%04X", cpu.sp))):
+          \(stackHex)
+        Mapping regs (page -> physical base):
+          [0]=\(String(format: "%05X", memory.mappingRegs[0])) [1]=\(String(format: "%05X", memory.mappingRegs[1])) [2]=\(String(format: "%05X", memory.mappingRegs[2])) [3]=\(String(format: "%05X", memory.mappingRegs[3]))
+        Mounted disks:
+        \(mountedDisks)
+        """
+
+        NSLog("%@", report)
+        try? (report + "\n").write(toFile: "/tmp/northmac_boot_trace.txt",
+                                    atomically: true, encoding: .utf8)
+    }
+
     func start() {
         guard !isRunning else { return }
         shouldRun = true
@@ -280,8 +356,10 @@ final class EmulatorCore: ObservableObject {
     private var med3cPollingScanned = false
     private var med3cPollingAddresses: [UInt16] = []
 
-    // Auto-inject ENTER key after boot ROM displays "LOAD SYSTEM"
-    // (triggered by checking video RAM for the prompt text)
+    // Auto-inject ENTER key after boot ROM displays "LOAD SYSTEM".
+    // Off by default — opt in via `--auto-enter` CLI flag, primarily for
+    // headless test runs where no human is at the keyboard.
+    var autoEnterEnabled: Bool = false
     private var autoEnterInjected = false
     private var autoEnterDelay: Int = 0
 
@@ -315,6 +393,13 @@ final class EmulatorCore: ObservableObject {
         ctx.trap_active = true
         ctx.trap_pc1 = 0xF33C
         ctx.trap_pc2 = 0xF33F
+        // Boot trace: one-shot dump at PC=0xC10A — the entry point ULTIMAN-
+        // style disks land at after the boot ROM's JP (HL) (load_page=0xC1,
+        // entry at byte 0xA of sector 4). Captures the state right as the
+        // disk's loaded code starts running. For other diagnostic points
+        // change to 0x8A96 (4K ROM kbd polling) or 0x818E (2K ROM JP HL).
+        ctx.boot_trace_pc = 0xC10A
+        ctx.boot_trace_armed = bootTraceArmed
         ctx.userdata = selfPtr
 
         // FDC callback: advance state machine, handle display interrupt
@@ -355,6 +440,14 @@ final class EmulatorCore: ObservableObject {
             core.syncMappingRegs()
         }
 
+        // Boot trace callback: dumps CPU/memory state at the configured PC.
+        // Fires once per arm (auto-disarms in C). Writes to NSLog + to
+        // /tmp/northmac_boot_trace.txt for easy capture.
+        ctx.boot_trace_callback = { userdata in
+            let core = Unmanaged<EmulatorCore>.fromOpaque(userdata!).takeUnretainedValue()
+            core.dumpBootTrace()
+        }
+
         while shouldRun {
             ctx.should_run = true
 
@@ -375,17 +468,20 @@ final class EmulatorCore: ObservableObject {
                 // halted — sleep until next frame
             }
 
-            // Auto-inject ENTER key for "LOAD SYSTEM" prompt during automated testing
-            if !autoEnterInjected {
+            // Auto-inject ENTER at "LOAD SYSTEM" prompt — only when explicitly
+            // enabled via the `--auto-enter` CLI flag for headless test runs.
+            if autoEnterEnabled && !autoEnterInjected {
                 autoEnterDelay += 1
                 if autoEnterDelay > 120 {
                     let videoBase = 0x20000
-                    let row3start = videoBase + 3 * 80
                     var hasContent = false
-                    for i in 0..<80 {
-                        if memory.ram[row3start + i] != 0x00 {
-                            hasContent = true
-                            break
+                    rowScan: for row in 0...3 {
+                        let rowStart = videoBase + row * 80
+                        for i in 0..<80 {
+                            if memory.ram[rowStart + i] != 0x00 {
+                                hasContent = true
+                                break rowScan
+                            }
                         }
                     }
                     if hasContent {
@@ -396,11 +492,13 @@ final class EmulatorCore: ObservableObject {
                 }
             }
 
-            // Write boot status to /tmp for automated testing (~10s after ENTER)
+            // Write boot status to /tmp ~10s after ENTER injection (test-mode only).
             if autoEnterInjected && autoEnterDelay == 720 {
                 writeBootStatus()
             }
-            autoEnterDelay += 1
+            if autoEnterEnabled {
+                autoEnterDelay += 1
+            }
 
             // Benchmark: report every second
             benchFrameCount += 1

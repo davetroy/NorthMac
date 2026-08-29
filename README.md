@@ -83,11 +83,22 @@ northmac disk1.nsi [disk2.nsi] [hd.nhd]
 - These mounts are **one-shot**: they do not overwrite the GUI's last-used
   selection, so the next launch (without args) restores your saved session.
 
-A wrapper script lives at `bin/northmac`. Symlink it onto your `$PATH`:
+A wrapper script lives at `bin/northmac`. Symlink it onto your `$PATH`
+using the **absolute** path to the script — `$(pwd)` only works if you're
+sitting in the repo root, which is a frequent footgun:
 
 ```
-ln -s "$(pwd)/bin/northmac" /usr/local/bin/northmac
+# /usr/local/bin (Intel default, root-owned — needs sudo)
+sudo ln -sf "$PWD/bin/northmac" /usr/local/bin/northmac
+
+# /opt/homebrew/bin (Apple Silicon, user-owned — no sudo)
+ln -sf "$PWD/bin/northmac" /opt/homebrew/bin/northmac
 ```
+
+(Run either of those from the repo root.) Verify with `which northmac` — if
+it prints a path but `northmac` errors with "file not found," your symlink
+target is wrong; re-create it with the absolute path printed by
+`realpath bin/northmac`.
 
 The wrapper expects the app at `/Applications/NorthMac.app`; override with
 `NORTHMAC_APP=/path/to/NorthMac.app northmac …`.

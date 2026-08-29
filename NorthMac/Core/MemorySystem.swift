@@ -18,9 +18,6 @@ final class MemorySystem {
     // Video RAM dirty flag for display refresh
     var videoDirty: Bool = false
 
-    // Boot ROM data (2KB, mirrored)
-    var bootROM: [UInt8] = []
-
     init() {
         ram = .allocate(capacity: MemorySystem.ramSize)
         ram.initialize(repeating: 0, count: MemorySystem.ramSize)
@@ -39,36 +36,27 @@ final class MemorySystem {
     }
 
     func loadBootROM(data: [UInt8]) {
-        bootROM = data
-        var patched = data
-
-        // Patch: NOP out JP signature check at offset 0x0189-0x018D.
-        // The boot ROM checks for JP (0xC3) at the entry point, but some
-        // CP/M disks (e.g. N2212_64) start with DI (0xF3) instead.
-        // Replace: CP C3H / JP NZ,806BH (5 bytes) with NOPs
-        if patched.count > 0x018D {
-            patched[0x0189] = 0x00  // NOP (was CP)
-            patched[0x018A] = 0x00  // NOP (was C3H)
-            patched[0x018B] = 0x00  // NOP (was JP NZ)
-            patched[0x018C] = 0x00  // NOP (was 6BH)
-            patched[0x018D] = 0x00  // NOP (was 80H)
-        }
-
-        // Load boot ROM at physical 0x30000 (page 12), mirror every 2KB across pages 12-15
+        // Load 2KB ROM into physical pages 12-15 with 8x mirroring inside
+        // each 16KB Z80 window, matching how the real PROM appears to the
+        // Z80 when mapping register 2 selects bank 14.
         let promBase = 0x30000
-        let promSize = min(patched.count, 0x800) // 2KB
+        let promSize = 0x800
         for page in 0..<4 {
             let pageBase = promBase + page * 0x4000
             for offset in stride(from: 0, to: 0x4000, by: promSize) {
-                for i in 0..<promSize {
-                    if pageBase + offset + i < MemorySystem.ramSize {
-                        ram[pageBase + offset + i] = patched[i]
-                    }
+                for i in 0..<promSize where i < data.count {
+                    ram[pageBase + offset + i] = data[i]
                 }
             }
         }
-        // Data is now in RAM; release the Swift array
-        bootROM = []
+
+        // Install RST vector stubs at low RAM (physical bank 0). These
+        // ensure any stray RST instruction in malformed disk code (e.g.
+        // a corrupted boot sector) bounces back to the boot ROM via the
+        // pushed return address rather than wandering off into garbage.
+        for rstVector in [0x0008, 0x0010, 0x0018, 0x0020, 0x0028, 0x0030, 0x0038] {
+            ram[rstVector] = 0xC9  // RET
+        }
     }
 
     // Translate logical Z80 address to physical address
@@ -103,8 +91,18 @@ final class MemorySystem {
         let bitMask: UInt8 = UInt8(1 << regIndex)
 
         if (data & 0x80) == 0 {
-            // High bit zero = map to RAM page
-            let page = Int(data & 0x07)
+            // High bit zero = map to RAM page.
+            // EXPERIMENT (May 2026): boot ROM at offset 0x0078 OUTs A=0 to
+            // port 0xA3 with comment "set 16k main ram to the last bank".
+            // With strict `data & 0x07` decoding A=0 always selects page 0,
+            // contradicting the comment. Hypothesis: when the low 3 bits are
+            // 0, the register index itself selects the natural page (R0→bank
+            // 0, R1→bank 1, R3→bank 3 = "last bank"). For Stephen Troy disks
+            // (load_page=0xC1), this puts page 3 RAM at a different physical
+            // bank than page 0, avoiding the stack collision that breaks
+            // ULTIMAN.
+            var page = Int(data & 0x07)
+            if data == 0 { page = regIndex }
             mappingRegs[regIndex] = page * 0x4000
             blankingFlag &= ~bitMask
         } else if (data & 0x84) == 0x84 {

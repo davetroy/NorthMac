@@ -222,7 +222,7 @@ final class IOSystem {
         blankDisplay = (ioCtl & 0x20) != 0
 
         // Bit 6: Speaker data — toggling generates tones
-        emulator.audio.speakerToggle(high: (ioCtl & 0x40) != 0)
+        emulator.audio.speakerToggle(high: (ioCtl & 0x40) != 0, cycles: emulator.cpuCycles)
 
         // Bit 7: Enable display interrupt
         displayInterruptEnabled = (ioCtl & 0x80) != 0
@@ -268,7 +268,11 @@ final class IOSystem {
             status |= 0x10
         }
 
-        // Bit 5: Disk at track 0
+        // Bit 5: Disk at track 0 — ACTIVE HIGH per ADE reference
+        // (ade_main.c:793-801, "disk at track 0 - HIGH"). The boot ROM
+        // patterns `AND 0x20 / JR Z` succeed only when bit 5 is CLEAR —
+        // those code paths are fallback/error handlers, not the main boot
+        // sequence. Real stock CP/M boots through a different path.
         if fdc.floppy.track0 {
             status |= 0x20
         }

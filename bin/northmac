@@ -37,4 +37,11 @@ for a in "$@"; do
     fi
 done
 
-exec "$BIN" "${args[@]}"
+# Launch via `open` so macOS LaunchServices activates the app properly
+# (window appears, dock icon registers, app becomes foreground). Direct exec
+# of a .app bundle binary from a TTY can leave the window unmapped.
+#
+# `-n` forces a new instance. `--args` forwards positional args to the
+# binary's argv (where CLILaunchArgs.parse picks them up). The conditional
+# expansion handles the empty-array case under bash 3.2 + `set -u`.
+exec /usr/bin/open -n -a "$APP" --args ${args[@]+"${args[@]}"}
