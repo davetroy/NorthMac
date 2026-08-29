@@ -18,6 +18,9 @@ final class MemorySystem {
     // Video RAM dirty flag for display refresh
     var videoDirty: Bool = false
 
+    static let map0Experiment =
+        ProcessInfo.processInfo.environment["NORTHMAC_MAP0_EXPERIMENT"] != nil
+
     init() {
         ram = .allocate(capacity: MemorySystem.ramSize)
         ram.initialize(repeating: 0, count: MemorySystem.ramSize)
@@ -101,8 +104,13 @@ final class MemorySystem {
             // (load_page=0xC1), this puts page 3 RAM at a different physical
             // bank than page 0, avoiding the stack collision that breaks
             // ULTIMAN.
+            // The experiment breaks DEMODIAG's bank integrity test (it maps
+            // register-index banks for zero writes, so pattern read-back sees
+            // the wrong bank). Off by default; set NORTHMAC_MAP0_EXPERIMENT
+            // to re-enable while chasing the ULTIMAN stack collision. The
+            // real Advantage's zero-write semantics are probeable on hardware.
             var page = Int(data & 0x07)
-            if data == 0 { page = regIndex }
+            if data == 0 && MemorySystem.map0Experiment { page = regIndex }
             mappingRegs[regIndex] = page * 0x4000
             blankingFlag &= ~bitMask
         } else if (data & 0x84) == 0x84 {

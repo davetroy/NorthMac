@@ -148,6 +148,7 @@ final class AudioSystem {
 
     /// Generate a standard beep (called on port 0x83 IN from boot ROM)
     func beep() {
+        if ProcessInfo.processInfo.environment["NORTHMAC_NO_AUDIO"] != nil { return }
         ensureEngineRunning()
         lock.lock()
         beepSamplesRemaining = Int(sampleRate * 0.25)  // 250ms beep
@@ -160,6 +161,7 @@ final class AudioSystem {
     /// Called from the emulator thread every time port 0xF8 is written.
     /// The Z80 software controls tone frequency by varying the toggle rate.
     func speakerToggle(high: Bool, cycles: UInt64 = 0) {
+        if ProcessInfo.processInfo.environment["NORTHMAC_NO_AUDIO"] != nil { return }
         lock.lock()
         let wasHigh = speakerState
         speakerState = high
