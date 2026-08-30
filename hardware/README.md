@@ -28,6 +28,17 @@ direct overlay. The outline includes the **connector tab** (edge
 relieved around a ~0.33" x 2.0" chamfered tongue, per the real SIO) —
 this outline is what goes on Edge.Cuts in the routed board.
 
+## riser.kicad_pcb / riser_fab.zip — THE FIRST FAB-READY BOARD
+
+`make_riser.py` generates a real KiCad board: the measured slot tab
+fanned out to a 2x15 0.1" header, every pin silkscreen-labeled, fully
+routed (evens on front with a half-pitch jog through the odd column,
+odds direct on back). **KiCad 10 DRC: 0 violations, 0 unconnected.**
+`riser_fab.zip` = Gerbers + drill, ready for PCBWay/JLCPCB. Order
+options: 1.6 mm, HASL or ENIG, and select **gold fingers + 20-degree
+bevel** on the connector edge. kicad-cli lives at
+`~/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli`.
+
 ## Plan
 
 1. **Breakout riser** — this footprint + 2×15 pin header + silkscreened

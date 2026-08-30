@@ -30,3 +30,9 @@ build/
 *.bak
 greenfield/test/*.raw
 greenfield/*.bin
+Disk Images/Dad/
+Resources/AdvantageBootRom.bin.2k
+Resources/AdvantageBootRom.bin.4k
+wsgtest/run_wsg
+wsgtest/*.wav
+hardware/riser.kicad_prl
