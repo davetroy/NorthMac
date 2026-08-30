@@ -6,7 +6,16 @@ against manual §3.9. Basis for the NS-WSG card design. Pins marked (?) need
 confirmation by buzz-out on a real card — see "To verify" below.*
 
 The slot connector (J1/P1 on the cards) is a **30-contact card-edge
-connector**. All signals are buffered by the motherboard ("B"/"IO" prefixes =
+connector: 15 positions per side at 0.125" (1/8") pitch** (measured from
+photos of a real SIO card against tape + DIP references, 2026-08-30).
+**Even pins ride the component side, odd pins the solder side** — position
+k carries pins 2k−1 (solder) / 2k (component), pin 1/2 at the end away
+from the "30" silkscreened on the card. **There is no polarization key**;
+orientation is enforced by the machine's card guides. Decoded from the
+SIO's selective gold plating (cards only plate pins they use), which
+matches the schematic pinout exactly.
+
+All signals are buffered by the motherboard ("B"/"IO" prefixes =
 buffered I/O bus); the motherboard does all port decoding and hands each slot
 a decoded /SELECT for its own 16-port window.
 
@@ -38,12 +47,24 @@ a decoded /SELECT for its own 16-port window.
 | 25  | IO0      | |
 | 26  | −12V     | |
 | 27  | +5V      | |
-| 28  | IO7 (?)  | SIO reads as 28; the PIO scan could be read as 26 — buzz out |
+| 28  | IO7      | resolved: both 26 and 28 plated on the SIO (it uses −12V and IO7) |
 | 29  | /SELECT  | this slot's decoded select for its 16-port window |
 | 30  | GND      | |
 
-Pins 2, 6, 8 do not appear on either card schematic — likely unused or
-additional grounds; confirm by buzz-out.
+Pins 2, 6, 8 are **confirmed unused**: the SIO leaves them unplated
+entirely (with pin 4, its unused second +5V, and pins 12/21, redundant
+grounds). A new card should plate and use all four grounds (1/12/21/30)
+and both +5V pins (4/27).
+
+## Physical (from SIO card photos, 2026-08-30)
+
+- Pitch 0.125", 15 positions/side, connector span 1.875" + margins
+- Gold depth ≈ 0.33" from the card edge
+- Card outline ≈ 5.3" × 3.15", fingers on the 3.15" edge, two mounting
+  holes near each corner of the connector edge; PCB thickness standard
+  (assume 0.062")
+- Reference: SIO = ASSY 00113 on PCB 00112 rev A (©1980); external
+  connector AMP 206584-1
 
 ## Mechanisms (from the card schematics)
 
@@ -80,11 +101,10 @@ reads are constants. On this bus that means:
 - The RP2040 never drives the bus. One 74LVC245 (inputs), two HCT541s
   (constants), one HCT138-ish decode, done.
 
-## To verify (buzz-out session on the real PIO card)
+## Remaining verification (optional, multimeter)
 
-1. IO7 on pin 28 vs 26 (and −12V on the other).
-2. /SELECT on 29; pins 2, 6, 8 unused?
-3. Physical: contact pitch, finger dimensions, card outline, bracket —
-   measure the PIO card with calipers; the connector on the motherboard
-   is the mating reference.
-4. Confirm /ID REQ polarity and that it is per-slot (schematics imply it).
+The photo/plating analysis resolved IO7 (28), pins 2/6/8 (unused), and
+the numbering convention. Still worth a one-time beep before fab:
+/SELECT on 29 (decoder enable), the ground group 1/12/21/30, and — only
+possible powered — /ID REQ polarity. None of these block the footprint
+or the breakout riser.
