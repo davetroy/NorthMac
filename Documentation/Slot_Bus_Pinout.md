@@ -59,7 +59,10 @@ and both +5V pins (4/27).
 ## Physical (from SIO card photos, 2026-08-30)
 
 - Pitch 0.125", 15 positions/side, connector span 1.875" + margins
-- Gold depth ≈ 0.33" from the card edge
+- The connector is a **protruding tab**: the card edge is relieved around
+  it and only the ~0.33"-deep, ~2.0"-long gold tongue (chamfered corners)
+  enters the slot connector
+- Gold depth ≈ 0.33" — the full tab depth
 - Card outline ≈ 5.3" × 3.15", fingers on the 3.15" edge, two mounting
   holes near each corner of the connector edge; PCB thickness standard
   (assume 0.062")

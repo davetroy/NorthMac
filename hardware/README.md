@@ -19,6 +19,15 @@ measured geometry (see `../Documentation/Slot_Bus_Pinout.md`):
 finger alignment and left/right orientation; then the breakout riser
 (below) verifies the electrical map against the live bus.
 
+## nswsg_layers_1to1.pdf / make_board_layers.py
+
+Placement-level design of the full v1 card as an 8-page, true-1:1 PDF:
+top/bottom assembly renders plus F.Cu / F.Mask / F.SilkS / B.Cu /
+B.Mask / B.SilkS fab-style plots. Back-side pages are x-mirrored for
+direct overlay. The outline includes the **connector tab** (edge
+relieved around a ~0.33" x 2.0" chamfered tongue, per the real SIO) —
+this outline is what goes on Edge.Cuts in the routed board.
+
 ## Plan
 
 1. **Breakout riser** — this footprint + 2×15 pin header + silkscreened
