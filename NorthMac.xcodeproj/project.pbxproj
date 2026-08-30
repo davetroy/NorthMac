@@ -23,6 +23,7 @@
 		A10000110000000000000011 /* z80.c in Sources */ = {isa = PBXBuildFile; fileRef = A20000110000000000000011 /* z80.c */; };
 
 		A10000160000000000000016 /* AudioSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000160000000000000016 /* AudioSystem.swift */; };
+		A100002A000000000000002A /* WSGDevice.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200002A000000000000002A /* WSGDevice.swift */; };
 		A10000170000000000000017 /* HardDiskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000170000000000000017 /* HardDiskController.swift */; };
 		A10000180000000000000018 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000180000000000000018 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -46,6 +47,7 @@
 		A20000130000000000000013 /* z80.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = z80.h; sourceTree = "<group>"; };
 		A20000140000000000000014 /* z80-bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "z80-bridge.h"; sourceTree = "<group>"; };
 		A20000160000000000000016 /* AudioSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSystem.swift; sourceTree = "<group>"; };
+		A200002A000000000000002A /* WSGDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WSGDevice.swift; sourceTree = "<group>"; };
 		A20000170000000000000017 /* HardDiskController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardDiskController.swift; sourceTree = "<group>"; };
 		A20000180000000000000018 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A30000010000000000000001 /* NorthMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NorthMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -99,6 +101,7 @@
 				A20000070000000000000007 /* DisplaySystem.swift */,
 				A20000080000000000000008 /* KeyboardSystem.swift */,
 				A20000160000000000000016 /* AudioSystem.swift */,
+				A200002A000000000000002A /* WSGDevice.swift */,
 				A20000170000000000000017 /* HardDiskController.swift */,
 			);
 			path = Core;
@@ -228,6 +231,7 @@
 				A10000100000000000000020 /* ResourceCache.swift in Sources */,
 				A10000110000000000000011 /* z80.c in Sources */,
 				A10000160000000000000016 /* AudioSystem.swift in Sources */,
+				A100002A000000000000002A /* WSGDevice.swift in Sources */,
 				A10000170000000000000017 /* HardDiskController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

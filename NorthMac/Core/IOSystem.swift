@@ -48,8 +48,12 @@ final class IOSystem {
             }
             return 0xFF
 
-        case 0x01...0x05:
-            // Slot cards 1-5 - stub
+        case 0x03:
+            // Slot 3 — NS-WSG sound card (experimental)
+            return emulator.audio.wsg.portIn(pLo)
+
+        case 0x01, 0x02, 0x04, 0x05:
+            // Other slot cards - stub
             return 0xFF
 
         case 0x06:
@@ -110,8 +114,13 @@ final class IOSystem {
                 emulator.hdc.hdcOut(port: pLo, data: data)
             }
 
-        case 0x01...0x05:
-            // Slot cards 1-5 - stub
+        case 0x03:
+            // Slot 3 — NS-WSG sound card (experimental)
+            emulator.audio.wsg.portOut(pLo, data)
+            emulator.audio.wsgActivity()
+
+        case 0x01, 0x02, 0x04, 0x05:
+            // Other slot cards - stub
             break
 
         case 0x06:
@@ -162,6 +171,7 @@ final class IOSystem {
         // Board ID mapping: p_lo & 0x07 -> 0=slot6, 1=slot5, 2=slot4, 3=slot3, 4=slot2, 5=slot1
         let slotMap: [Int: UInt8] = [
             0: 0xBF,  // slot 6 = HDC (0xBF) — only when HD mounted
+            3: WSGDevice.boardID,  // slot 3 = NS-WSG sound card (0xA5)
             4: 0xDB,  // slot 2 = PIO (0xDB)
             5: 0xF7,  // slot 1 = SIO (0xF7)
         ]

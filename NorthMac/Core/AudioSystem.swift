@@ -11,6 +11,9 @@ import AVFoundation
 /// speaker state, producing authentic square-wave tones at whatever frequency the
 /// Z80 software programs.
 final class AudioSystem {
+    /// NS-WSG slot card (experimental) — mixed into the render callback.
+    let wsg = WSGDevice()
+
     private var audioEngine: AVAudioEngine?
     private var sourceNode: AVAudioSourceNode?
     private let sampleRate: Double = 44100.0
@@ -122,6 +125,10 @@ final class AudioSystem {
                     self.lpState += 0.45 * (sample - self.lpState)
                     data[frame] = self.lpState
                 }
+
+                // NS-WSG voices mix in unfiltered (the card has its own DAC
+                // path on real hardware, not the speaker cone)
+                self.wsg.renderAdd(into: data, frames: frames, sampleRate: self.sampleRate)
             }
 
             self.lock.lock()
@@ -153,6 +160,15 @@ final class AudioSystem {
         lock.lock()
         beepSamplesRemaining = Int(sampleRate * 0.25)  // 250ms beep
         beepPhase = 0.0
+        lastAudioActivity = mach_absolute_time()
+        lock.unlock()
+    }
+
+    /// Register write reaching the NS-WSG card: keep the engine awake.
+    func wsgActivity() {
+        if ProcessInfo.processInfo.environment["NORTHMAC_NO_AUDIO"] != nil { return }
+        ensureEngineRunning()
+        lock.lock()
         lastAudioActivity = mach_absolute_time()
         lock.unlock()
     }
@@ -210,7 +226,8 @@ final class AudioSystem {
     func checkSilence() {
         lock.lock()
         let isSilent = beepSamplesRemaining <= 0 &&
-                        samplesSinceLastToggle > decayThreshold
+                        samplesSinceLastToggle > decayThreshold &&
+                        !wsg.active
         let lastActivity = lastAudioActivity
         lock.unlock()
 
