@@ -32,6 +32,8 @@ final class FloppyDiskController {
         var acquireMode: Bool = true  // HIGH
         var acquireModePrev: Bool = true
 
+        var writeTargetSector: Int = 0  // captured when the write flag is armed
+
         var dataBuffer: [UInt8] = [UInt8](repeating: 0, count: 0x202)
         var bytePtr: Int = 0
         var crcVal: UInt8 = 0
@@ -167,14 +169,21 @@ final class FloppyDiskController {
             drives[1].motorOn = true
 
         case 3:
-            // Set disk write flag
+            // Set disk write flag.  Hardware-faithful (manual 3.7.7): software
+            // arms the flag within 150us of the sector-mark edge, and the data
+            // lands in the sector that begins at that mark.  The state machine
+            // bumps the counter at state 20 (mid-mark), so in the pre-increment
+            // mark states the target is sectorNum+1; the old unconditional
+            // incrementSectorNum() here put hardware-correct writers one
+            // sector off.
             var f = floppy
+            let preIncrement = (f.fdcState == 15 || f.fdcState == 18)
+            f.writeTargetSector = preIncrement ? (f.sectorNum + 1) % 10 : f.sectorNum
             f.diskWriteFlag = true
             f.bytePtr = 0
             f.fdcState = 200
             f.fdcStateCounter = 0
             floppy = f
-            incrementSectorNum()
 
         default:
             break
@@ -317,9 +326,9 @@ final class FloppyDiskController {
 
         let storeSectNum: Int
         if f.side != 0 {
-            storeSectNum = (((f.maxTracks * 2) - 1) - f.trackNum) * 10 + f.sectorNum
+            storeSectNum = (((f.maxTracks * 2) - 1) - f.trackNum) * 10 + f.writeTargetSector
         } else {
-            storeSectNum = f.trackNum * 10 + f.sectorNum
+            storeSectNum = f.trackNum * 10 + f.writeTargetSector
         }
 
         let offset = storeSectNum * 512
