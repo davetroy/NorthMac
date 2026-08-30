@@ -1,10 +1,10 @@
 ; wsgtest.asm — standalone NS-WSG demo for the NorthStar Advantage.
 ;
 ; Probes the six I/O slots for the NS-WSG card (board ID 0xA5, STATUS 0x57),
-; uploads three waveforms, then plays forever:
-;   voice 0: arpeggio melody on a triangle wave
-;   voice 1: low drone on a pseudo-sine
-;   voice 2: slow siren sweep on the pseudo-sine
+; uploads four waveforms, then loops a reel of Pac-Man-style effects
+; (all original renditions in the arcade spirit): waka chomps, power-pill
+; gulp loop, ghost-eat zips, fruit chime, death warble with final bloops,
+; a two-voice jingle, and the chase siren.
 ;
 ; Video: draws one wide bar per detected state so the machine shows life —
 ;   bar at scanline 40: program running
@@ -74,135 +74,367 @@ found:
         ld   e,60               ; bar 2: WSG detected
         call bar
 
-        ; ---- upload waveforms 0-2 (96 nibbles from wavedat) ----
+        ; ---- upload waveforms 0-3 (128 nibbles from wavedat) ----
         ld   a,(wbase)
         ld   c,a                ; C = WTIDX port
         xor  a
         out  (c),a              ; index 0
         inc  c                  ; C = WTDAT port
         ld   hl,wavedat
-        ld   b,96
+        ld   b,128
 wup:
         ld   a,(hl)
         inc  hl
         out  (c),a
         djnz wup
 
-        ; ---- enable, set the static voices ----
+        ; ---- enable ----
         ld   a,(wbase)
         add  a,RCTRL
         ld   c,a
         ld   a,1
         out  (c),a              ; master enable
 
-        ; voice 1 drone: C3 (freq 1429 = 0x0595), wave 0, volume 6
+; ---- effects reel ---------------------------------------------------------
+show:
+        call fx_waka
+        call rest
+        call fx_pill
+        call rest
+        call fx_eatg
+        call rest
+        call fx_fruit
+        call rest
+        call fx_death
+        call rest
+        call fx_jingle
+        call rest
+        call fx_siren
+        call rest
+        call rest
+        jp   show
+
+; ---------------------------------------------------------------------------
+; helpers.  wout: write A to WSG reg E (preserves A,E; clobbers C)
+; setf: load voice frequency — HL=freq, E=voice FLO offset (preserves HL,DE,E)
+; dlyms: delay B milliseconds.  mute: all voices volume 0.
+; ---------------------------------------------------------------------------
+wout:
+        push af
         ld   a,(wbase)
-        add  a,8                ; voice 1 FLO
+        add  a,e
         ld   c,a
-        ld   a,095h
+        pop  af
         out  (c),a
-        inc  c
-        ld   a,005h
-        out  (c),a
-        inc  c
+        ret
+
+setf:
+        ld   a,l
+        call wout
+        inc  e
+        ld   a,h
+        call wout
+        inc  e
         xor  a
-        out  (c),a
-        inc  c
-        ld   a,006h             ; vol 6, wave 0
-        out  (c),a
+        call wout
+        dec  e
+        dec  e
+        ret
 
-        ; voice 2 siren: start 1000, wave 0, volume 5
-        ld   hl,1000
-        ld   (sirf),hl
-        ld   hl,8
-        ld   (sird),hl
-        ld   a,(wbase)
-        add  a,0fh              ; voice 2 VW
-        ld   c,a
-        ld   a,005h             ; vol 5, wave 0
-        out  (c),a
-
-        ; voice 0 melody setup: wave 1, volume 12
-        ld   a,(wbase)
-        add  a,7                ; voice 0 VW
-        ld   c,a
-        ld   a,01ch             ; vol 12, wave 1
-        out  (c),a
-
-; ---- demo loop: melody notes, siren swept between them --------------------
-demo:
-        ld   ix,melody
-note:
-        ld   a,(ix+0)
-        or   (ix+1)
-        jr   nz,n1
-        ld   ix,melody          ; wrap
-        jr   note
-n1:
-        ld   a,(wbase)
-        add  a,4                ; voice 0 FLO
-        ld   c,a
-        ld   a,(ix+0)
-        out  (c),a
-        inc  c
-        ld   a,(ix+1)
-        out  (c),a
-        inc  c
-        xor  a
-        out  (c),a
-        inc  ix
-        inc  ix
-
-        ld   b,60               ; ~0.18 s per note, sweeping the siren
-d1:
+dlyms:
+dm1:
         push bc
-        call sirstep
-        ld   bc,1100
-d2:
+        ld   bc,150
+dm2:
         dec  bc
         ld   a,b
         or   c
-        jr   nz,d2
+        jr   nz,dm2
         pop  bc
-        djnz d1
-        jr   note
+        djnz dm1
+        ret
 
-; sirstep — advance the siren by one step and reload voice 2 frequency
-sirstep:
-        ld   hl,(sirf)
-        ld   de,(sird)
+mute:
+        xor  a
+        ld   e,7
+        call wout
+        ld   e,0bh
+        call wout
+        ld   e,0fh
+        call wout
+        ret
+
+rest:
+        call mute
+        ld   b,200
+        call dlyms
+        ld   b,200
+        call dlyms
+        ret
+
+; ---------------------------------------------------------------------------
+; waka — eight chomps, alternating quick down / up glisses on the saw wave
+; ---------------------------------------------------------------------------
+fx_waka:
+        ld   b,8
+fw1:
+        push bc
+        ld   a,3ch              ; vol 12, wave 3 (saw)
+        ld   e,7
+        call wout
+        ld   a,b
+        and  1
+        jr   z,fw_up
+        ld   hl,3500            ; "wa": gliss down
+        ld   de,-230
+        jr   fw_go
+fw_up:
+        ld   hl,1200            ; "ka": gliss up
+        ld   de,230
+fw_go:
+        ld   c,10
+fw2:
+        push bc
+        push de
+        push hl
+        ld   e,4
+        call setf
+        ld   b,6
+        call dlyms
+        pop  hl
+        pop  de
         add  hl,de
-        ld   (sirf),hl
-        ld   de,3000
-        or   a
-        sbc  hl,de
+        pop  bc
+        dec  c
+        jr   nz,fw2
+        ld   a,30h              ; gap: volume 0
+        ld   e,7
+        call wout
+        ld   b,45
+        call dlyms
+        pop  bc
+        djnz fw1
+        jp   mute
+
+; ---------------------------------------------------------------------------
+; power pill — a rising gulp loop, four times round
+; ---------------------------------------------------------------------------
+fx_pill:
+        ld   a,1ah              ; vol 10, wave 1 (triangle)
+        ld   e,7
+        call wout
+        ld   c,4
+fp1:
+        push bc
+        ld   hl,800
+        ld   b,8
+fp2:
+        push bc
+        push hl
+        ld   e,4
+        call setf
+        ld   b,12
+        call dlyms
+        pop  hl
+        ld   de,200
         add  hl,de
-        jr   c,ss1
-        ld   hl,-8              ; hit the top: sweep down
-        ld   (sird),hl
-        jr   ss2
-ss1:
+        pop  bc
+        djnz fp2
+        pop  bc
+        dec  c
+        jr   nz,fp1
+        jp   mute
+
+; ---------------------------------------------------------------------------
+; ghost eaten — four fast ascending zips, each starting higher (200/400/800/1600)
+; ---------------------------------------------------------------------------
+fx_eatg:
+        ld   hl,500
+        ld   c,4
+fe1:
+        push bc
+        push hl
+        ld   a,3dh              ; vol 13, wave 3
+        ld   e,7
+        call wout
+        ld   b,24
+fe2:
+        push bc
+        push hl
+        ld   e,4
+        call setf
+        ld   b,4
+        call dlyms
+        pop  hl
+        ld   de,230
+        add  hl,de
+        pop  bc
+        djnz fe2
+        ld   a,30h              ; gap
+        ld   e,7
+        call wout
+        ld   b,90
+        call dlyms
+        pop  hl
+        ld   de,350
+        add  hl,de
+        pop  bc
+        dec  c
+        jr   nz,fe1
+        jp   mute
+
+; ---------------------------------------------------------------------------
+; fruit chime — quick two-note ding on the sine
+; ---------------------------------------------------------------------------
+fx_fruit:
+        ld   a,0bh              ; vol 11, wave 0 (sine)
+        ld   e,7
+        call wout
+        ld   hl,8563            ; G5
+        ld   e,4
+        call setf
+        ld   b,70
+        call dlyms
+        ld   hl,11430           ; C6
+        call setf
+        ld   b,150
+        call dlyms
+        jp   mute
+
+; ---------------------------------------------------------------------------
+; death — long descending warble (wobbling pitch), then two low bloops
+; ---------------------------------------------------------------------------
+fx_death:
+        ld   a,1ch              ; vol 12, wave 1
+        ld   e,7
+        call wout
+        ld   hl,4200
+        ld   c,36
+fd1:
+        push bc
+        push hl
+        ld   e,4
+        call setf
+        ld   b,7
+        call dlyms
+        pop  hl
+        push hl
+        ld   de,350             ; wobble up
+        add  hl,de
+        ld   e,4
+        call setf
+        ld   b,7
+        call dlyms
+        pop  hl
+        ld   de,-100            ; and settle lower
+        add  hl,de
+        pop  bc
+        dec  c
+        jr   nz,fd1
+        xor  a                  ; beat of silence
+        ld   e,7
+        call wout
+        ld   b,80
+        call dlyms
+        ld   a,0ch              ; bloop, bloop
+        ld   e,7
+        call wout
+        ld   hl,1000
+        ld   e,4
+        call setf
+        ld   b,80
+        call dlyms
+        xor  a
+        ld   e,7
+        call wout
+        ld   b,60
+        call dlyms
+        ld   a,0ch
+        ld   e,7
+        call wout
+        ld   hl,800
+        ld   e,4
+        call setf
+        ld   b,110
+        call dlyms
+        jp   mute
+
+; ---------------------------------------------------------------------------
+; jingle — short two-voice fanfare: melody on triangle, bass on sine
+; ---------------------------------------------------------------------------
+fx_jingle:
+        ld   a,1ch              ; melody: vol 12, wave 1
+        ld   e,7
+        call wout
+        ld   a,08h              ; bass: vol 8, wave 0
+        ld   e,0bh
+        call wout
+        ld   ix,jingled
+fj1:
+        ld   l,(ix+0)
+        ld   h,(ix+1)
+        ld   a,l
+        or   h
+        jp   z,mute
+        ld   e,4
+        call setf
+        ld   l,(ix+2)
+        ld   h,(ix+3)
+        ld   e,8
+        call setf
+        inc  ix
+        inc  ix
+        inc  ix
+        inc  ix
+        ld   b,110
+        call dlyms
+        jr   fj1
+
+; ---------------------------------------------------------------------------
+; siren — two full up-down sweeps
+; ---------------------------------------------------------------------------
+fx_siren:
+        ld   a,09h              ; vol 9, wave 0
+        ld   e,7
+        call wout
+        ld   c,2
+fs1:
+        ld   hl,1000            ; C survives the sweep: fs2/fs4 guard it
+        ld   de,25
+fs2:
+        push bc
+        push de
+        push hl
+        ld   e,4
+        call setf
+        ld   b,6
+        call dlyms
+        pop  hl
+        pop  de
+        add  hl,de
+        ld   a,h
+        cp   12                 ; past ~3000: turn around
+        jr   c,fs3
+        ld   de,-25
+fs3:
+        bit  7,d
+        jr   z,fs4
+        push de
         ld   de,1000
         or   a
         sbc  hl,de
         add  hl,de
-        jr   nc,ss2
-        ld   hl,8               ; hit the bottom: sweep up
-        ld   (sird),hl
-ss2:
-        ld   a,(wbase)
-        add  a,0ch              ; voice 2 FLO
-        ld   c,a
-        ld   hl,(sirf)
-        ld   a,l
-        out  (c),a
-        inc  c
-        ld   a,h
-        out  (c),a
-        inc  c
-        xor  a
-        out  (c),a
-        ret
+        pop  de
+        jr   nc,fs4
+        pop  bc
+        dec  c
+        jr   nz,fs1x
+        jp   mute
+fs1x:
+        jr   fs1
+fs4:
+        pop  bc
+        jr   fs2
 
 idle:
         jr   idle
@@ -241,7 +473,7 @@ br2:
         ret
 
 ; ---- data -----------------------------------------------------------------
-; three 32-nibble waveforms: 0 = pseudo-sine, 1 = triangle, 2 = 25% pulse
+; four 32-nibble waveforms: 0 sine, 1 triangle, 2 = 25% pulse, 3 double saw
 wavedat:
         db  8,9,11,12,13,14,14,15,15,15,14,14,13,12,11,9
         db  8,6,4,3,2,1,1,0,0,0,1,1,2,3,4,6
@@ -249,8 +481,17 @@ wavedat:
         db  15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
         db  15,15,15,15,15,15,15,15,0,0,0,0,0,0,0,0
         db  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        db  0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+        db  0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
 
-; melody: C4 E4 G4 C5 G4 E4 (freq = Hz / 0.0915527)
-melody:
-        dw   2858, 3601, 4282, 5715, 4282, 3601
-        dw   0
+; jingle: (melody, bass) pairs, 110 ms per step, 0 = end
+; melody C5 E5 G5 C6 G5 E5 C5, bass alternating C3/G3
+jingled:
+        dw   5715, 1429
+        dw   7199, 2141
+        dw   8563, 1429
+        dw  11430, 2141
+        dw   8563, 1429
+        dw   7199, 2141
+        dw   5715, 1429
+        dw   0, 0

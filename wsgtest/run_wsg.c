@@ -114,8 +114,14 @@ int main(int argc, char** argv){
     double nextTick = 0.0;
     const double cyclesPerTick = 4000000.0/96000.0;
 
+    int warned = 0;
     while(cpu.cyc < budget){
         z80_step(&cpu);
+        if(!warned && cpu.sp && cpu.sp < 0xFD00){
+            fprintf(stderr, "SP LEAK: sp=%04X at pc=%04X cyc=%llu\n",
+                    cpu.sp, cpu.pc, (unsigned long long)cpu.cyc);
+            warned = 1;
+        }
         while((double)cpu.cyc >= nextTick && ns < maxSamples){
             float s = wsg_tick();
             if(s > 1.0f) s = 1.0f; if(s < -1.0f) s = -1.0f;
@@ -127,7 +133,7 @@ int main(int argc, char** argv){
 
     double rms = 0; for(long i=0;i<ns;i++) rms += (double)pcm[i]*pcm[i];
     rms = ns ? sqrt(rms/ns) : 0;
-    fprintf(stderr, "wrote %s: %ld samples (%.1f s), rms=%.0f, enable=%d vols=%d/%d/%d\n",
-            argv[2], ns, ns/96000.0, rms, wsgEnable, wvol[0], wvol[1], wvol[2]);
+    fprintf(stderr, "wrote %s: %ld samples (%.1f s), rms=%.0f, enable=%d vols=%d/%d/%d pc=%04X sp=%04X\n",
+            argv[2], ns, ns/96000.0, rms, wsgEnable, wvol[0], wvol[1], wvol[2], cpu.pc, cpu.sp);
     return 0;
 }
