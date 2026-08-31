@@ -76,10 +76,10 @@ pad("", "np_thru_hole", 1.30, 2.28, 0.126, 0.126, ["*.Cu", "*.Mask"], drill=3.2,
 
 txt(0.62, 0.32, "NS-WSG BUS RISER v1", size=1.1)
 txt(0.62, 0.42, "NorthStar Advantage slot breakout", size=0.7)
-txt(0.30, 2.32, "pin 1/2 end", size=0.7)
+txt(0.30, 2.24, "pin 1/2 end", size=0.7)
 txt(0.30, 0.52, "pin 29/30 end", size=0.7)
-txt(0.62, 2.36, "\u00a9 2026 David Troy", size=0.8)
-txt(0.62, 2.44, "in memory of Stephen Troy", size=0.8)
+txt(0.40, 2.37, "\u00a9 2026 David Troy", size=0.8)
+txt(0.40, 2.46, "in memory of Stephen Troy", size=0.8)
 
 nets = "\n".join(f'  (net {i} "P{i}")' for i in range(1, 31))
 pcb = f'''(kicad_pcb (version 20221018) (generator nswsg)
