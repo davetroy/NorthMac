@@ -98,6 +98,38 @@ SP leaks / runaway PC.
 4. Software: NSPacMan driver layer (probe 0xA5, three voices, speaker
    fallback) — planned next after the card exists in emulation only.
 
+## Future revisions (design notes, 2026-08-31)
+
+**v2 candidates (fit the current RP2040):**
+- **Readable port**: one more '541 with inputs on Pico GPIOs, OE from a
+  decoded read — the Pico parks a byte, wired logic does the timing
+  (same trick as STATUS, but variable). Enables WiFi→Z80 transfer and
+  USB-keyboard→Z80. Add a data-ready handshake bit.
+- **USB host (keyboard)**: PIO-USB full-speed host on GP16/17 + USB-A
+  jack + 5V. Two destinations: the readable port (CP/M polls it), and —
+  the killer app for the ten bare logic boards — a bridge cable driving
+  the motherboard's native keyboard connector (kbconn pinout from the
+  conversion doc) via an I2C GPIO expander (~9 lines needed). Mouse:
+  skip; the machine has no pointer concept.
+- **Audio amp stage** (PAM8302-class) so a bare 8-ohm speaker works
+  from J1 directly.
+
+**v3 candidate — I/O framebuffer + HDMI (Pico 2 W era):**
+- A slot card CANNOT see the native framebuffer (video RAM is on the
+  memory bus; the slot carries only the I/O bus). HDMI of the real
+  display belongs to the T7 video-tap conversion project.
+- What fits: a SECOND framebuffer as an I/O device — X/Y/data ports,
+  auto-increment, same geometry as the native display (80 cols x 256
+  scanlines, MSB-left) so drawing code ports unchanged; Pico renders it
+  over DVI with CRT aesthetics. I/O write speed (~1 us/byte) is the
+  vintage-feel guarantee: the Z80 stays the bottleneck.
+- Resources: DVI eats an RP2040 (PicoDVI = overclock + a PIO + a core);
+  WSG+bus+USB+DVI won't coexist on one. RP2350 (Pico 2 W, same socket)
+  has HSTX = near-free DVI + a third PIO block. **Constraint to honor
+  in any video revision: HSTX is fixed on GPIO 12-19**, colliding with
+  today's bus-capture/I2S map — v3 must remap (bus GP0-11, strobes and
+  I2S relocated) before layout.
+
 ## Lessons banked along the way
 
 - wsgtest found the slot-base formula bug (base = idIndex<<4, NOT
