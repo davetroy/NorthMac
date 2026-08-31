@@ -28,8 +28,9 @@ def pad(num, kind, x, y, sx, sy, layers, drill=None, shape="circle", net=None):
     lay = ' '.join(f'"{l}"' for l in layers)
     n = f' (net {NID[net]} "{net}")' if net else ''
     pads.append(f'    (pad "{_pn[0]}" {kind} {shape} (at {mm(x)} {mm(y)}) (size {mm(sx)} {mm(sy)}){d} (layers {lay}){n})')
-def txt(x, y, t, size=0.9, layer="F.SilkS"):
-    texts.append(f'  (gr_text "{t}" (at {mm(x)} {mm(y)}) (layer "{layer}") (effects (font (size {size} {size}) (thickness 0.15))))')
+def txt(x, y, t, size=0.9, layer="F.SilkS", angle=0):
+    a = f" {angle}" if angle else ""
+    texts.append(f'  (gr_text "{t}" (at {mm(x)} {mm(y)}{a}) (layer "{layer}") (effects (font (size {size} {size}) (thickness 0.15))))')
 
 # ---- slot fingers (only the pins we use, like the SIO) ----
 slot = {1:"GND",3:"IDREQ",4:"+5V",9:"IOA2",10:"IOA3",11:"IOA1",12:"GND",
@@ -51,7 +52,7 @@ def dip(x, y, n, ref, nets):
         pad(n-i, "thru_hole", x+0.3, y + i*0.1, 0.062, 0.062, ["*.Cu","*.Mask"],
             drill=0.8, net=nets.get(n-i))
     texts.append(f'  (gr_rect (start {mm(x+0.04)} {mm(y-0.06)}) (end {mm(x+0.26)} {mm(y+(rows-1)*0.1+0.06)}) (layer "F.SilkS") (width 0.15) (fill none))')
-    txt(x - 0.02, y - 0.14, ref, 0.8)
+    txt(x + 0.15, y + (rows-1)*0.05, ref, 0.8, angle=90)
 
 IO = ["IO0","IO1","IO2","IO3","IO4","IO5","IO6","IO7"]
 dip(0.65, 0.20, 20, "U1 LVC245", {1:"+3V3",10:"GND",19:"GND",20:"+3V3",
@@ -80,7 +81,7 @@ for i in range(4):
         shape="rect", net=u6nets.get(i+1))
     pad(0, "smd", 4.637, y6, 0.061, 0.024, ["F.Cu","F.Mask","F.Paste"],
         shape="rect", net=u6nets.get(8-i))
-txt(4.36, 0.62, "U6B SOP-8 alt", 0.8)
+txt(4.53, 0.62, "U6B", 0.8)
 
 # ---- Pico module: bottom row pins 1-20 L2R at y=1.93, top row 21-40 R2L at y=1.23
 pico = {1:"GP0",2:"GP1",3:"GND",4:"GP2",5:"GP3",6:"GP4",7:"GP5",8:"GND",
@@ -94,7 +95,7 @@ for i in range(20):
     pad(pn, "thru_hole", 1.95 + i*0.1, 1.23, 0.062, 0.062, ["*.Cu","*.Mask"],
         drill=0.8, net=pico.get(pn))
 texts.append(f'  (gr_rect (start {mm(1.88)} {mm(1.17)}) (end {mm(3.92)} {mm(1.99)}) (layer "F.SilkS") (width 0.15) (fill none))')
-txt(2.35, 1.58, "RASPBERRY PI PICO W (socketed)", 1.0)
+txt(2.87, 1.62, "PICO W (socketed)", 1.0)
 txt(3.55, 1.10, "ANTENNA", 0.8)
 texts.append(f'  (zone (net 0) (net_name "") (layers "F.Cu" "B.Cu") (name "antenna-keepout") (hatch edge 0.508)'
              f' (connect_pads (clearance 0))'
@@ -104,18 +105,18 @@ texts.append(f'  (zone (net 0) (net_name "") (layers "F.Cu" "B.Cu") (name "anten
              f' (polygon (pts (xy {mm(3.62)} {mm(1.14)}) (xy {mm(4.02)} {mm(1.14)}) (xy {mm(4.02)} {mm(2.02)}) (xy {mm(3.62)} {mm(2.02)}))))')
 
 # ---- audio (PJRC PT8211 adapter topology, stereo) + connectors ----
-def r2(ref, x, y, n1, n2, dy=0.3):
+def r2(ref, x, y, n1, n2, dy=0.3, lx=None, ly=None):
     pad("1", "thru_hole", x, y, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net=n1)
     pad("2", "thru_hole", x, y+dy, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net=n2)
-    txt(x + 0.06, y + dy/2, ref, 0.8)
-r2("R6 10R", 4.20, 0.75, "+3V3", "VDDF", dy=0.1)
-r2("C11 47u", 4.32, 0.75, "VDDF", "GND", dy=0.1)
-r2("C9 47u", 4.20, 1.00, "LCH", "AOL_C", dy=0.1)
-r2("C12 47u", 4.32, 1.00, "RCH", "AOR_C", dy=0.1)
-r2("R4 1K", 4.20, 1.60, "PWM", "PWMF")
-r2("C10 100n", 4.36, 1.60, "PWMF", "GND")
-r2("C13 10u", 4.52, 1.60, "PWMF", "AOL_C")
-r2("R5 10K", 4.66, 1.60, "AOL_C", "J2SIG")
+    txt(x + 0.06 if lx is None else lx, y + dy/2 if ly is None else ly, ref, 0.8)
+r2("R6", 4.20, 0.75, "+3V3", "VDDF", dy=0.1, lx=4.11, ly=0.80)
+r2("C11", 4.32, 0.75, "VDDF", "GND", dy=0.1, lx=4.42, ly=0.80)
+r2("C9", 4.20, 1.00, "LCH", "AOL_C", dy=0.1, lx=4.11, ly=1.05)
+r2("C12", 4.32, 1.00, "RCH", "AOR_C", dy=0.1, lx=4.42, ly=1.05)
+r2("R4", 4.20, 1.60, "PWM", "PWMF", lx=4.20, ly=1.98)
+r2("C10", 4.36, 1.60, "PWMF", "GND", lx=4.36, ly=1.98)
+r2("C13", 4.52, 1.60, "PWMF", "AOL_C", lx=4.52, ly=1.98)
+r2("R5", 4.66, 1.60, "AOL_C", "J2SIG", lx=4.66, ly=1.98)
 # J1: CUI SJ1-3523N 3.5mm TRS jack (footprint from the KiCad library,
 # rotated so the barrel overhangs the right board edge). T=left, R=right.
 jx, jy = 4.92, 0.62
@@ -129,7 +130,7 @@ for name, rx, ry, (sw,sh), (dw,dh), net in jack:
     pads.append(f'    (pad "{name}" thru_hole oval (at {mm(jx+rx*MMI)} {mm(jy+ry*MMI)}) (size {sw} {sh}) (drill oval {dw} {dh}) (layers "*.Cu" "*.Mask") (net {NID[net]} "{net}"))')
 for rx, ry in [(0,5),(2.5,5),(-5,0),(0,-5),(2.5,-5)]:
     pad("", "np_thru_hole", jx+rx*MMI, jy+ry*MMI, 0.047, 0.047, ["*.Cu","*.Mask"], drill=1.2)
-txt(4.62, 0.28, "J1 3.5MM SJ1-3523N", 0.8)
+txt(4.82, 0.20, "J1 3.5MM", 0.8)
 pad("1", "thru_hole", 4.98, 1.35, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="J2SIG")
 pad("2", "thru_hole", 4.98, 1.45, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
 txt(4.60, 1.28, "J2 SPKR MIX", 0.8)
@@ -137,7 +138,8 @@ txt(4.60, 1.28, "J2 SPKR MIX", 0.8)
 for i,(cx, cy, v) in enumerate([(0.55,0.10,"+3V3"),(0.55,1.20,"+3V3"),
     (1.15,0.10,"+5V"),(1.15,1.20,"+5V"),(1.15,2.25,"+5V"),
     (3.95,0.30,"VDDF"),(2.30,2.20,"+5V"),(3.30,2.20,"+5V")]):
-    r2(f"C{i+1}", cx, cy, v, "GND", dy=0.1)
+    lx = cx - 0.10 if i == 5 else None    # C6: keep clear of U6's pins
+    r2(f"C{i+1}", cx, cy, v, "GND", dy=0.1, lx=lx)
 
 # ---- mounting holes, outline, silk ----
 for hx, hy in [(0.25,0.25),(0.25,CH-0.25),(CW-0.25,0.25),(CW-0.25,CH-0.25)]:
@@ -149,7 +151,7 @@ for i in range(len(pts)-1):
     edges.append(f'  (gr_line (start {mm(x1)} {mm(y1)}) (end {mm(x2)} {mm(y2)}) (layer "Edge.Cuts") (width 0.1))')
 txt(2.30, 0.10, "NS-WSG v1 - NorthStar Advantage wavetable sound card", 1.0)
 txt(2.30, 0.24, "board ID 0xA5 - spec NSWSG.md", 0.8)
-txt(2.00, 3.04, "\u00a9 2026 David Troy, in memory of Stephen Troy.", 0.9)
+txt(2.95, 3.04, "\u00a9 2026 David Troy, in memory of Stephen Troy.", 0.9)
 
 nets_s = "\n".join(f'  (net {NID[n]} "{n}")' for n in NETS)
 netclass_members = "\n".join(f'    (add_net "{n}")' for n in NETS)
