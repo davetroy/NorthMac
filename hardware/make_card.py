@@ -67,8 +67,9 @@ dip(1.25, 1.30, 20, "U4 ST 0x57", {1:"RD3",19:"IOA3",10:"GND",20:"+5V",
     **{18-i: IO[i] for i in range(8)}})
 dip(1.25, 2.35, 16, "U5 HCT138", {1:"IOA0",2:"IOA1",3:"IOA2",4:"SEL",
     5:"BRD",6:"+5V",8:"GND",12:"RD3",16:"+5V"})
-u6nets = {1:"BCK",2:"WS",3:"DIN",4:"GND",5:"+3V3",6:"AOR",8:"AOL"}
-dip(4.05, 0.30, 8, "U6 PT8211 (VERIFY PINOUT)", u6nets)
+# PT8211 pinout per datasheet (PT8211-S.pdf): 6=LCH, 8=RCH, 7=NC
+u6nets = {1:"BCK",2:"WS",3:"DIN",4:"GND",5:"+3V3",6:"AOL",8:"AOR"}
+dip(4.05, 0.30, 8, "U6 PT8211", u6nets)
 # U6B: alternate SOP-8 land beside the DIP position, same nets —
 # populate ONE of the two. Full SOIC-8 land: 1.27 mm pitch, rows
 # 5.4 mm apart, pads 1.55 x 0.6 mm.

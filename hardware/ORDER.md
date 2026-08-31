@@ -27,10 +27,11 @@
 1. ~~1:1 print of the edge fingers vs a real SIO card~~ — done, exact match
 2. Riser goes in the machine before any card gets soldered (geometry +
    pinout live-verify)
-3. **Verify the PT8211 pinout against the SOP-8 datasheet** before
-   soldering (silk-flagged). Package resolved: the board now carries a
-   dual U6 position — DIP-8 socket AND a full SOP-8 land (U6B) beside
-   it, same nets. Populate exactly one.
+3. ~~Verify the PT8211 pinout~~ — **done** (PT8211-S.pdf in this
+   directory): 6=LCH/8=RCH were swapped in the draft netlist (harmless
+   — mono sum) and are now corrected. Dual U6 position: DIP-8 socket or
+   SOP-8 land (U6B), populate exactly one. Both packages exist
+   (PT8211 = DIP, PT8211-S = SO).
 4. Footprint audit (2026-08-31): everything on the boards is standard
    0.1" through-hole (DIP sockets, Pico rows at the official 0.700"
    spacing, headers). J1 is deliberately a 1x3 header — wire a pigtail

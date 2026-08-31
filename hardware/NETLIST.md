@@ -114,11 +114,17 @@ read responses come from U3/U4.
 
 ## Audio
 
-- U6 PT8211 (3.3 V): L+R outputs summed through 1 kΩ each → 10 µF
-  coupling cap → J1 3.5 mm jack tip/ring (mono on both), and → 10 kΩ
-  series → J2 speaker mix-in header.
-- Verify U6 package pinout against the PT8211 datasheet at schematic
-  time (marked TODO; do not trust memory for its 8 pins).
+- U6 PT8211, pinout **verified against the datasheet** (PT8211-S.pdf,
+  in this directory): 1 BCK, 2 WS, 3 DIN, 4 GND, 5 VDD, 6 LCH, 7 NC,
+  8 RCH. Dual position on the board: DIP-8 socket or SOP-8 land (U6B).
+- LCH+RCH summed through 1 kΩ each → 10 µF coupling → J1 header
+  (line-level out to a jack pigtail), and → 10 kΩ → J2 speaker mix-in.
+- Supply: datasheet nominal is 5 V; we run it at **3.3 V**, the
+  established Pico-ecosystem practice (Pico Audio Pack does the same),
+  which keeps the Pico's 3.3 V logic within input thresholds.
+- **Firmware note: the PT8211 takes "Japanese"/LSB-justified 16-bit
+  serial data, NOT standard I2S** — the PIO program must use the
+  right-justified format (or the DAC plays garbage at the wrong level).
 
 ## Bus loading note
 
