@@ -17,7 +17,7 @@ def mmy(v): return round(-int(v)/10000.0, 4)
 nsegs = nvias = 0
 while i < len(t):
     if t[i] == '(' and i+1 < len(t) and t[i+1] == 'net':
-        net = t[i+2]
+        net = t[i+2].strip('"')
         depth = 1
         j = i+3
         cur = nid.get(net)

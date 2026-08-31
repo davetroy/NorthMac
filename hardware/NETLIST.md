@@ -117,8 +117,14 @@ read responses come from U3/U4.
 - U6 PT8211, pinout **verified against the datasheet** (PT8211-S.pdf,
   in this directory): 1 BCK, 2 WS, 3 DIN, 4 GND, 5 VDD, 6 LCH, 7 NC,
   8 RCH. Dual position on the board: DIP-8 socket or SOP-8 land (U6B).
-- LCH+RCH summed through 1 kΩ each → 10 µF coupling → J1 header
-  (line-level out to a jack pigtail), and → 10 kΩ → J2 speaker mix-in.
+- **Stereo, PJRC PT8211-adapter topology** (protosupplies.com Teensy
+  adapter / PJRC kit): LCH → C9 47 µF → J1 tip; RCH → C12 47 µF → J1
+  ring. J1 = CUI SJ1-3523N 3.5 mm TRS (footprint from the KiCad
+  library), barrel overhanging the right board edge.
+- VDD filter per the datasheet app circuit: +3V3 → R6 10 Ω → VDDF,
+  with C11 47 µF + C6 100 nF at the pin.
+- J2 speaker mix-in: left channel via R5 10 kΩ. PWM fallback: GP21 →
+  R4 1 kΩ → C10 100 nF LPF → C13 10 µF → left channel.
 - Supply: datasheet nominal is 5 V; we run it at **3.3 V**, the
   established Pico-ecosystem practice (Pico Audio Pack does the same),
   which keeps the Pico's 3.3 V logic within input thresholds.

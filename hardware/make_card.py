@@ -15,7 +15,7 @@ NETS = ["GND","+5V","+3V3",
 "IOA0","IOA1","IOA2","IOA3","SEL","BWR","BRD","IDREQ","BIORES","MHZ8",
 "GP0","GP1","GP2","GP3","GP4","GP5","GP6","GP7","GP8","GP9","GP10",
 "GP11","GP12","GP13","GP14","GP15","RD3","BCK","WS","DIN","PWM",
-"AOL","AOR","ASUM","AOUT","PWMF"]
+"LCH","RCH","AOL_C","AOR_C","VDDF","J2SIG","PWMF"]
 NID = {n: i+1 for i, n in enumerate(NETS)}
 
 def mm(v): return round(v * IN, 4)
@@ -67,19 +67,20 @@ dip(1.25, 1.30, 20, "U4 ST 0x57", {1:"RD3",19:"IOA3",10:"GND",20:"+5V",
     **{18-i: IO[i] for i in range(8)}})
 dip(1.25, 2.35, 16, "U5 HCT138", {1:"IOA0",2:"IOA1",3:"IOA2",4:"SEL",
     5:"BRD",6:"+5V",8:"GND",12:"RD3",16:"+5V"})
-# PT8211 pinout per datasheet (PT8211-S.pdf): 6=LCH, 8=RCH, 7=NC
-u6nets = {1:"BCK",2:"WS",3:"DIN",4:"GND",5:"+3V3",6:"AOL",8:"AOR"}
+# PT8211 pinout per datasheet (PT8211-S.pdf): 6=LCH, 8=RCH, 7=NC.
+# VDD fed through the datasheet RC filter (R6 10R + C11 47u + C6 100n).
+u6nets = {1:"BCK",2:"WS",3:"DIN",4:"GND",5:"VDDF",6:"LCH",8:"RCH"}
 dip(4.05, 0.30, 8, "U6 PT8211", u6nets)
 # U6B: alternate SOP-8 land beside the DIP position, same nets —
 # populate ONE of the two. Full SOIC-8 land: 1.27 mm pitch, rows
 # 5.4 mm apart, pads 1.55 x 0.6 mm.
 for i in range(4):
     y6 = 0.375 + i * 0.05
-    pad(0, "smd", 4.494, y6, 0.061, 0.024, ["F.Cu","F.Mask","F.Paste"],
+    pad(0, "smd", 4.425, y6, 0.061, 0.024, ["F.Cu","F.Mask","F.Paste"],
         shape="rect", net=u6nets.get(i+1))
-    pad(0, "smd", 4.706, y6, 0.061, 0.024, ["F.Cu","F.Mask","F.Paste"],
+    pad(0, "smd", 4.637, y6, 0.061, 0.024, ["F.Cu","F.Mask","F.Paste"],
         shape="rect", net=u6nets.get(8-i))
-txt(4.42, 0.62, "U6B SOP-8 alt", 0.8)
+txt(4.36, 0.62, "U6B SOP-8 alt", 0.8)
 
 # ---- Pico module: bottom row pins 1-20 L2R at y=1.93, top row 21-40 R2L at y=1.23
 pico = {1:"GP0",2:"GP1",3:"GND",4:"GP2",5:"GP3",6:"GP4",7:"GP5",8:"GND",
@@ -102,30 +103,40 @@ texts.append(f'  (zone (net 0) (net_name "") (layers "F.Cu" "B.Cu") (name "anten
              f' (fill (thermal_gap 0.5) (thermal_bridge_width 0.5))'
              f' (polygon (pts (xy {mm(3.62)} {mm(1.14)}) (xy {mm(4.02)} {mm(1.14)}) (xy {mm(4.02)} {mm(2.02)}) (xy {mm(3.62)} {mm(2.02)}))))')
 
-# ---- audio passives + connectors ----
+# ---- audio (PJRC PT8211 adapter topology, stereo) + connectors ----
 def r2(ref, x, y, n1, n2, dy=0.3):
     pad("1", "thru_hole", x, y, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net=n1)
     pad("2", "thru_hole", x, y+dy, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net=n2)
     txt(x + 0.06, y + dy/2, ref, 0.8)
-r2("R1 1K", 4.30, 0.75, "AOL", "ASUM")
-r2("R2 1K", 4.45, 0.75, "AOR", "ASUM")
-r2("C9 10u", 4.62, 0.75, "ASUM", "AOUT")
+r2("R6 10R", 4.20, 0.75, "+3V3", "VDDF", dy=0.1)
+r2("C11 47u", 4.32, 0.75, "VDDF", "GND", dy=0.1)
+r2("C9 47u", 4.20, 1.00, "LCH", "AOL_C", dy=0.1)
+r2("C12 47u", 4.32, 1.00, "RCH", "AOR_C", dy=0.1)
 r2("R4 1K", 4.20, 1.60, "PWM", "PWMF")
 r2("C10 100n", 4.36, 1.60, "PWMF", "GND")
-r2("R5 10K", 4.52, 1.60, "PWMF", "ASUM")
-# J1 audio out: plain 1x3 0.1" header (pigtail to a panel jack) — a real
-# TRS jack footprint needs a chosen part + datasheet; v2 material.
-pad("1", "thru_hole", 4.80, 0.30, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
-pad("2", "thru_hole", 4.80, 0.40, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
-pad("3", "thru_hole", 4.80, 0.50, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
-txt(4.48, 0.18, "J1 AUDIO OUT", 0.8)
-pad("1", "thru_hole", 4.95, 1.35, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
-pad("2", "thru_hole", 4.95, 1.45, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
+r2("C13 10u", 4.52, 1.60, "PWMF", "AOL_C")
+r2("R5 10K", 4.66, 1.60, "AOL_C", "J2SIG")
+# J1: CUI SJ1-3523N 3.5mm TRS jack (footprint from the KiCad library,
+# rotated so the barrel overhangs the right board edge). T=left, R=right.
+jx, jy = 4.92, 0.62
+MMI = 1/25.4
+jack = [  # (dx,dy) mm pre-rotation -> rotated (y,-x); sizes rotate too
+    ("T", -5, -5, (2.2,1.2), (1.4,0.4), "AOL_C"),
+    ("S",  0,  0, (1.2,2.2), (0.4,1.4), "GND"),
+    ("R", -5,  5, (2.2,1.2), (1.4,0.4), "AOR_C"),
+]
+for name, rx, ry, (sw,sh), (dw,dh), net in jack:
+    pads.append(f'    (pad "{name}" thru_hole oval (at {mm(jx+rx*MMI)} {mm(jy+ry*MMI)}) (size {sw} {sh}) (drill oval {dw} {dh}) (layers "*.Cu" "*.Mask") (net {NID[net]} "{net}"))')
+for rx, ry in [(0,5),(2.5,5),(-5,0),(0,-5),(2.5,-5)]:
+    pad("", "np_thru_hole", jx+rx*MMI, jy+ry*MMI, 0.047, 0.047, ["*.Cu","*.Mask"], drill=1.2)
+txt(4.62, 0.28, "J1 3.5MM SJ1-3523N", 0.8)
+pad("1", "thru_hole", 4.98, 1.35, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="J2SIG")
+pad("2", "thru_hole", 4.98, 1.45, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
 txt(4.60, 1.28, "J2 SPKR MIX", 0.8)
 # decoupling: (x, y, vcc)
 for i,(cx, cy, v) in enumerate([(0.55,0.10,"+3V3"),(0.55,1.20,"+3V3"),
     (1.15,0.10,"+5V"),(1.15,1.20,"+5V"),(1.15,2.25,"+5V"),
-    (3.95,0.30,"+3V3"),(2.30,2.20,"+5V"),(3.30,2.20,"+5V")]):
+    (3.95,0.30,"VDDF"),(2.30,2.20,"+5V"),(3.30,2.20,"+5V")]):
     r2(f"C{i+1}", cx, cy, v, "GND", dy=0.1)
 
 # ---- mounting holes, outline, silk ----

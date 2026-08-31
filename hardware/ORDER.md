@@ -34,8 +34,9 @@
    (PT8211 = DIP, PT8211-S = SO).
 4. Footprint audit (2026-08-31): everything on the boards is standard
    0.1" through-hole (DIP sockets, Pico rows at the official 0.700"
-   spacing, headers). J1 is deliberately a 1x3 header — wire a pigtail
-   to a panel-mount 3.5 mm jack; a real jack footprint is v2 material.
+   spacing, headers). J1 is now a real CUI SJ1-3523N TRS jack using the
+   KiCad-maintained footprint (CUI datasheet-derived); output is true
+   stereo per the PJRC PT8211 adapter topology.
    Radial caps on the 0.3" axial positions just need a bent lead.
 
 ## BOM (per assembled card)
@@ -51,11 +52,14 @@
 | — | DIP sockets: 4 × 20-pin, 1 × 16-pin, 1 × 8-pin | everything socketed |
 | C1–C6 | 0.1 µF ceramic | decoupling |
 | C7, C8 | 10 µF electrolytic | bulk, +5V |
-| C9 | 10 µF NP electrolytic | audio coupling |
+| C9, C12 | 47 µF electrolytic | L/R audio coupling (PJRC topology) |
+| C11 | 47 µF electrolytic | VDDF bulk |
+| C13 | 10 µF electrolytic | PWM-fallback coupling |
+| R6 | 10 Ω | VDD filter |
 | C10 | 100 nF | PWM filter |
-| R1, R2, R4 | 1 kΩ | audio sum / PWM |
+| R4 | 1 kΩ | PWM filter |
 | R5 | 10 kΩ | PWM into sum |
-| J1 | 1×3 0.1" header + panel-mount 3.5 mm jack on pigtail | line out |
+| J1 | CUI SJ1-3523N 3.5 mm TRS jack | stereo line out; KiCad-library footprint |
 | J2 | 1×2 0.1" header | speaker mix-in |
 
 Riser BOM: 2 × 1×15 (or one 2×15) 0.1" male header.
