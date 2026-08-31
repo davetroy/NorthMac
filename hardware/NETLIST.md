@@ -83,7 +83,14 @@ alias at base+0xB.
 | 12 Y3 | /RD3 → U4./G1 |
 | others | n/c |
 
-## Pico (RP Pico module) — GPIO map
+## Pico W (socketed) — GPIO map
+
+The module is a **Raspberry Pi Pico W** on female headers (WH variant =
+pre-soldered pins + JST-SH debug connector). WiFi enables OTA firmware
+updates and a live synth-state web view; the antenna end (opposite USB,
+pins ~19-22) has a board keep-out: no vias or copper pour beneath it,
+only those pins' own escapes. Firmware: WiFi/lwIP on core 0, WSG synth
++ PIO bus capture on core 1.
 
 | GPIO | net | role |
 |------|-----|------|
@@ -97,8 +104,10 @@ alias at base+0xB.
 | GP19 | WS → U6 | I2S word select |
 | GP20 | DIN → U6 | I2S data |
 | GP21 | PWM audio (fallback path) → R/C → J2 | |
-| GP25 | onboard LED: activity blink | |
-| SWCLK/SWDIO | J3 | debug |
+| (LED) | on the wireless chip on Pico W — firmware-only | |
+
+Debug: the Pico WH's own JST-SH SWD connector and USB (BOOTSEL / OTA);
+no board-level debug header.
 
 The Pico **never drives the slot bus** — U1/U2 are inputs only; the two
 read responses come from U3/U4.

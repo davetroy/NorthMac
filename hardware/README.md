@@ -43,7 +43,9 @@ bevel** on the connector edge. kicad-cli lives at
 
 1. **Breakout riser** — this footprint + 2×15 pin header + silkscreened
    pin names. Validates geometry and pinout on a real machine for ~$10.
-2. **NS-WSG card** — riser front-end + RP2040 (Pico reference design) +
+2. **NS-WSG card** — riser front-end + Raspberry Pi **Pico W** (socketed;
+   WiFi for OTA updates + live synth telemetry; antenna keep-out zone at
+   the module's right end) +
    74LVC245 bus input + two strapped 74HCT541s (board ID 0xA5 via
    /ID REQ, STATUS 0x57) + PWM/RC or PT8211 audio out + speaker mix-in
    header. Spec: `../Documentation/NSWSG.md`; design record:

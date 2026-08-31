@@ -15,7 +15,7 @@ NETS = ["GND","+5V","+3V3",
 "IOA0","IOA1","IOA2","IOA3","SEL","BWR","BRD","IDREQ","BIORES","MHZ8",
 "GP0","GP1","GP2","GP3","GP4","GP5","GP6","GP7","GP8","GP9","GP10",
 "GP11","GP12","GP13","GP14","GP15","RD3","BCK","WS","DIN","PWM",
-"AOL","AOR","ASUM","AOUT","PWMF","SWCLK","SWDIO"]
+"AOL","AOR","ASUM","AOUT","PWMF"]
 NID = {n: i+1 for i, n in enumerate(NETS)}
 
 def mm(v): return round(v * IN, 4)
@@ -81,11 +81,15 @@ for i in range(20):
     pn = 40 - i
     pad(pn, "thru_hole", 1.95 + i*0.1, 1.23, 0.062, 0.062, ["*.Cu","*.Mask"],
         drill=0.8, net=pico.get(pn))
-pad(41, "thru_hole", 3.95, 1.48, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net="SWCLK")
-pad(42, "thru_hole", 3.95, 1.58, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net="GND")
-pad(43, "thru_hole", 3.95, 1.68, 0.062, 0.062, ["*.Cu","*.Mask"], drill=0.8, net="SWDIO")
 texts.append(f'  (gr_rect (start {mm(1.88)} {mm(1.17)}) (end {mm(3.92)} {mm(1.99)}) (layer "F.SilkS") (width 0.15) (fill none))')
-txt(2.45, 1.58, "RASPBERRY PI PICO", 1.0)
+txt(2.35, 1.58, "RASPBERRY PI PICO W (socketed)", 1.0)
+txt(3.55, 1.10, "ANTENNA", 0.8)
+texts.append(f'  (zone (net 0) (net_name "") (layers "F.Cu" "B.Cu") (name "antenna-keepout") (hatch edge 0.508)'
+             f' (connect_pads (clearance 0))'
+             f' (min_thickness 0.25)'
+             f' (keepout (tracks allowed) (vias not_allowed) (pads allowed) (copperpour not_allowed) (footprints allowed))'
+             f' (fill (thermal_gap 0.5) (thermal_bridge_width 0.5))'
+             f' (polygon (pts (xy {mm(3.62)} {mm(1.14)}) (xy {mm(4.02)} {mm(1.14)}) (xy {mm(4.02)} {mm(2.02)}) (xy {mm(3.62)} {mm(2.02)}))))')
 
 # ---- audio passives + connectors ----
 def r2(ref, x, y, n1, n2, dy=0.3):
@@ -106,10 +110,6 @@ txt(4.55, 0.18, "J1 AUDIO", 0.8)
 pad("1", "thru_hole", 4.95, 1.35, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
 pad("2", "thru_hole", 4.95, 1.45, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
 txt(4.60, 1.28, "J2 SPKR MIX", 0.8)
-pad("1", "thru_hole", 4.95, 2.40, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="SWCLK")
-pad("2", "thru_hole", 4.95, 2.50, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
-pad("3", "thru_hole", 4.95, 2.60, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="SWDIO")
-txt(4.70, 2.30, "J3 SWD", 0.8)
 # decoupling: (x, y, vcc)
 for i,(cx, cy, v) in enumerate([(0.55,0.10,"+3V3"),(0.55,1.20,"+3V3"),
     (1.15,0.10,"+5V"),(1.15,1.20,"+5V"),(1.15,2.25,"+5V"),
