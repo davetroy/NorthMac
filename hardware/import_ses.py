@@ -25,6 +25,7 @@ while i < len(t):
             if t[j] == '(':
                 if t[j+1] == 'path' and cur is not None:
                     layer = t[j+2]; width = int(t[j+3])/10000.0
+                    if 0.15 <= width < 0.2: width = 0.2   # kiss min-width
                     pts = []
                     k = j+4
                     while t[k] != ')':

@@ -27,9 +27,10 @@
 1. ~~1:1 print of the edge fingers vs a real SIO card~~ — done, exact match
 2. Riser goes in the machine before any card gets soldered (geometry +
    pinout live-verify)
-3. **Verify PT8211 pinout AND package against the datasheet** before
-   populating U6 (silk-flagged). It commonly ships as SOP-8: if DIP-8
-   is unavailable, use an SOP-8-to-DIP-8 adapter in the socket.
+3. **Verify the PT8211 pinout against the SOP-8 datasheet** before
+   soldering (silk-flagged). Package resolved: the board now carries a
+   dual U6 position — DIP-8 socket AND a full SOP-8 land (U6B) beside
+   it, same nets. Populate exactly one.
 4. Footprint audit (2026-08-31): everything on the boards is standard
    0.1" through-hole (DIP sockets, Pico rows at the official 0.700"
    spacing, headers). J1 is deliberately a 1x3 header — wire a pigtail
@@ -45,7 +46,7 @@
 | U1, U2 | SN74LVC245AN (DIP-20) | 3.3 V supply, 5 V-tolerant inputs |
 | U3, U4 | SN74HCT541N (DIP-20) | ID 0xA5 / STATUS 0x57 |
 | U5 | SN74HCT138N (DIP-16) | read decode |
-| U6 | PT8211 (DIP) | I2S DAC — **verify pinout** |
+| U6 | PT8211-S (SOP-8) → U6B land, or DIP adapter in socket | I2S DAC — **verify pinout**; populate one position only |
 | — | DIP sockets: 4 × 20-pin, 1 × 16-pin, 1 × 8-pin | everything socketed |
 | C1–C6 | 0.1 µF ceramic | decoupling |
 | C7, C8 | 10 µF electrolytic | bulk, +5V |
@@ -57,6 +58,18 @@
 | J2 | 1×2 0.1" header | speaker mix-in |
 
 Riser BOM: 2 × 1×15 (or one 2×15) 0.1" male header.
+
+**Audio output options** (J1 is line-level, ~1 Vpp, from the DAC through
+a coupling cap):
+- Powered speakers / amplified PC desktop speakers / line-in: plug
+  straight into the J1 pigtail jack — the intended path.
+- A bare 8 Ω speaker (PC-case beeper style) directly on J1: will be
+  nearly inaudible — line-out cannot drive 8 Ω. Use a $2 amp module
+  (PAM8302/LM386) between J1 and the speaker, or wait for v2 which
+  should add an on-board amp stage.
+- J2 SPKR MIX feeds the WSG into the Advantage's own internal speaker
+  amplifier (tap point per the conversion notes) — the self-contained
+  option: game sound from the machine's own speaker.
 
 Approx totals: boards + shipping ≈ $60–90; parts ≈ $20/card.
 
