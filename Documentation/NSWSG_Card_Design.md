@@ -13,9 +13,9 @@ manufacturable Advantage sound card. Companion documents:
 | Emulation (WSGDevice.swift, slot 3) | working — audible in NorthMac |
 | Independent C model (wsgtest/run_wsg.c) | working — renders WAV, FFT-verified |
 | Bare-metal demo/acceptance test (wsgtest.asm) | working — slot probe, waveform upload, Pac-Man-style effects reel |
-| Slot bus pinout | extracted from SIO/PIO schematics; 4 items await buzz-out |
-| Physical measurements (pitch, outline) | pending caliper session on the real PIO card |
-| KiCad design | not started (unblocked once measurements land) |
+| Slot bus pinout | fully decoded (schematics + SIO plating pattern + user's counts) |
+| Physical measurements | done via photo analysis; 1:1 print check matched the SIO exactly |
+| Boards | **ORDERED from PCBWay 2026-08-31**: 10x riser + 5x card, 2-layer 1.6mm, gold fingers + bevel. Both DRC-clean at full severity. |
 
 ## Key findings
 
