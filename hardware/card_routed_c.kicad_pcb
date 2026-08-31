@@ -364,6 +364,7 @@
   (gr_text "C8" (at 170.3440 122.1500) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.15))))
   (gr_text "NS-WSG v1 - NorthStar Advantage wavetable sound card" (at 143.4200 67.5400) (layer "F.SilkS") (effects (font (size 1.0 1.0) (thickness 0.15))))
   (gr_text "board ID 0xA5 - spec NSWSG.md" (at 143.4200 71.0960) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.15))))
+  (gr_text "© 2026 David Troy, in memory of Stephen Troy." (at 135.8000 142.2160) (layer "F.SilkS") (effects (font (size 0.9 0.9) (thickness 0.15))))
   (segment (start 139.6100 96.2420) (end 139.6100 96.0120) (width 0.25) (layer "F.Cu") (net 1))
   (segment (start 139.6100 96.0120) (end 135.4219 91.8239) (width 0.25) (layer "F.Cu") (net 1))
   (segment (start 135.4219 91.8239) (end 116.7500 91.8239) (width 0.25) (layer "F.Cu") (net 1))

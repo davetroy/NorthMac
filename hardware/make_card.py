@@ -126,6 +126,7 @@ for i in range(len(pts)-1):
     edges.append(f'  (gr_line (start {mm(x1)} {mm(y1)}) (end {mm(x2)} {mm(y2)}) (layer "Edge.Cuts") (width 0.1))')
 txt(2.30, 0.10, "NS-WSG v1 - NorthStar Advantage wavetable sound card", 1.0)
 txt(2.30, 0.24, "board ID 0xA5 - spec NSWSG.md", 0.8)
+txt(2.00, 3.04, "\u00a9 2026 David Troy, in memory of Stephen Troy.", 0.9)
 
 nets_s = "\n".join(f'  (net {NID[n]} "{n}")' for n in NETS)
 netclass_members = "\n".join(f'    (add_net "{n}")' for n in NETS)
