@@ -1,0 +1,189 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 6752 >>
+stream
+0.5 w 0 g
+BT /F2 14 Tf 54.0 742.0 Td (NS-WSG Boards - Parts Shopping List) Tj ET
+BT /F1 8 Tf 54.0 726.0 Td (Quantities cover 3 card builds + 1 riser set, with spares.  BOM detail: hardware/ORDER.md) Tj ET
+BT /F1 8 Tf 54.0 714.0 Td (Boards ordered from PCBWay 2026-08-31 \(10x riser, 5x card\).  \(c\) 2026 David Troy, in memory of Stephen Troy.) Tj ET
+BT /F2 9 Tf 72.0 690.0 Td (Qty) Tj ET
+BT /F2 9 Tf 100.0 690.0 Td (Part) Tj ET
+BT /F2 9 Tf 268.0 690.0 Td (Package / detail) Tj ET
+BT /F2 9 Tf 420.0 690.0 Td (Refs) Tj ET
+BT /F2 9 Tf 470.0 690.0 Td (Source / note) Tj ET
+54 684 m 558 684 l S
+BT /F2 9 Tf 54.0 668.0 Td (SEMICONDUCTORS & MODULES) Tj ET
+54 664 m 558 664 l S
+54 651 8 8 re S
+BT /F1 9 Tf 72.0 652.0 Td (3) Tj ET
+BT /F1 9 Tf 100.0 652.0 Td (Raspberry Pi Pico WH) Tj ET
+BT /F1 8 Tf 268.0 652.0 Td (RP2040 + WiFi, headers pre-soldered) Tj ET
+BT /F1 8 Tf 420.0 652.0 Td (module) Tj ET
+BT /F1 7 Tf 470.0 652.0 Td (official reseller; ~$7 ea) Tj ET
+54 636 8 8 re S
+BT /F1 9 Tf 72.0 637.0 Td (6) Tj ET
+BT /F1 9 Tf 100.0 637.0 Td (SN74LVC245AN) Tj ET
+BT /F1 8 Tf 268.0 637.0 Td (DIP-20, octal bus xcvr) Tj ET
+BT /F1 8 Tf 420.0 637.0 Td (U1, U2) Tj ET
+BT /F1 7 Tf 470.0 637.0 Td (TI; DigiKey/Mouser) Tj ET
+54 621 8 8 re S
+BT /F1 9 Tf 72.0 622.0 Td (6) Tj ET
+BT /F1 9 Tf 100.0 622.0 Td (SN74HCT541N) Tj ET
+BT /F1 8 Tf 268.0 622.0 Td (DIP-20, octal buffer) Tj ET
+BT /F1 8 Tf 420.0 622.0 Td (U3, U4) Tj ET
+BT /F1 7 Tf 470.0 622.0 Td (TI; DigiKey/Mouser) Tj ET
+54 606 8 8 re S
+BT /F1 9 Tf 72.0 607.0 Td (3) Tj ET
+BT /F1 9 Tf 100.0 607.0 Td (SN74HCT138N) Tj ET
+BT /F1 8 Tf 268.0 607.0 Td (DIP-16, 3-to-8 decoder) Tj ET
+BT /F1 8 Tf 420.0 607.0 Td (U5) Tj ET
+BT /F1 7 Tf 470.0 607.0 Td (TI; DigiKey/Mouser) Tj ET
+54 591 8 8 re S
+BT /F1 9 Tf 72.0 592.0 Td (3) Tj ET
+BT /F1 9 Tf 100.0 592.0 Td (PT8211-S) Tj ET
+BT /F1 8 Tf 268.0 592.0 Td (SOP-8, 16-bit stereo DAC) Tj ET
+BT /F1 8 Tf 420.0 592.0 Td (U6B) Tj ET
+BT /F1 7 Tf 470.0 592.0 Td (LCSC/AliExpress; solders to the SOP land) Tj ET
+BT /F2 9 Tf 54.0 575.0 Td (SOCKETS & HEADERS) Tj ET
+54 571 m 558 571 l S
+54 558 8 8 re S
+BT /F1 9 Tf 72.0 559.0 Td (12) Tj ET
+BT /F1 9 Tf 100.0 559.0 Td (DIP-20 socket) Tj ET
+BT /F1 8 Tf 268.0 559.0 Td (0.3 in) Tj ET
+BT /F1 8 Tf 420.0 559.0 Td (U1-U4) Tj ET
+BT /F1 7 Tf 470.0 559.0 Td () Tj ET
+54 543 8 8 re S
+BT /F1 9 Tf 72.0 544.0 Td (3) Tj ET
+BT /F1 9 Tf 100.0 544.0 Td (DIP-16 socket) Tj ET
+BT /F1 8 Tf 268.0 544.0 Td (0.3 in) Tj ET
+BT /F1 8 Tf 420.0 544.0 Td (U5) Tj ET
+BT /F1 7 Tf 470.0 544.0 Td () Tj ET
+54 528 8 8 re S
+BT /F1 9 Tf 72.0 529.0 Td (3) Tj ET
+BT /F1 9 Tf 100.0 529.0 Td (DIP-8 socket) Tj ET
+BT /F1 8 Tf 268.0 529.0 Td (0.3 in) Tj ET
+BT /F1 8 Tf 420.0 529.0 Td (U6 alt) Tj ET
+BT /F1 7 Tf 470.0 529.0 Td (only if using DIP PT8211/adapter) Tj ET
+54 513 8 8 re S
+BT /F1 9 Tf 72.0 514.0 Td (6) Tj ET
+BT /F1 9 Tf 100.0 514.0 Td (Female header 1x20, 0.1 in) Tj ET
+BT /F1 8 Tf 268.0 514.0 Td (Pico socket) Tj ET
+BT /F1 8 Tf 420.0 514.0 Td (module) Tj ET
+BT /F1 7 Tf 470.0 514.0 Td (or cut from longer strips) Tj ET
+54 498 8 8 re S
+BT /F1 9 Tf 72.0 499.0 Td (1) Tj ET
+BT /F1 9 Tf 100.0 499.0 Td (Male header strip 0.1 in) Tj ET
+BT /F1 8 Tf 268.0 499.0 Td (40-pin breakaway, x5 strips) Tj ET
+BT /F1 8 Tf 420.0 499.0 Td (J2 + risers) Tj ET
+BT /F1 7 Tf 470.0 499.0 Td (risers need 2x15 each) Tj ET
+BT /F2 9 Tf 54.0 482.0 Td (PASSIVES \(per-card refs; qty covers 3 builds + spares\)) Tj ET
+54 478 m 558 478 l S
+54 465 8 8 re S
+BT /F1 9 Tf 72.0 466.0 Td (25) Tj ET
+BT /F1 9 Tf 100.0 466.0 Td (0.1 uF ceramic) Tj ET
+BT /F1 8 Tf 268.0 466.0 Td (50V, 0.1 in lead spacing) Tj ET
+BT /F1 8 Tf 420.0 466.0 Td (C1-C6, C10) Tj ET
+BT /F1 7 Tf 470.0 466.0 Td () Tj ET
+54 450 8 8 re S
+BT /F1 9 Tf 72.0 451.0 Td (10) Tj ET
+BT /F1 9 Tf 100.0 451.0 Td (10 uF electrolytic) Tj ET
+BT /F1 8 Tf 268.0 451.0 Td (16V+ radial) Tj ET
+BT /F1 8 Tf 420.0 451.0 Td (C7, C8, C13) Tj ET
+BT /F1 7 Tf 470.0 451.0 Td () Tj ET
+54 435 8 8 re S
+BT /F1 9 Tf 72.0 436.0 Td (10) Tj ET
+BT /F1 9 Tf 100.0 436.0 Td (47 uF electrolytic) Tj ET
+BT /F1 8 Tf 268.0 436.0 Td (16V+ radial) Tj ET
+BT /F1 8 Tf 420.0 436.0 Td (C9, C11, C12) Tj ET
+BT /F1 7 Tf 470.0 436.0 Td (audio coupling + VDD bulk) Tj ET
+54 420 8 8 re S
+BT /F1 9 Tf 72.0 421.0 Td (5) Tj ET
+BT /F1 9 Tf 100.0 421.0 Td (10 ohm 1/4W) Tj ET
+BT /F1 8 Tf 268.0 421.0 Td (axial) Tj ET
+BT /F1 8 Tf 420.0 421.0 Td (R6) Tj ET
+BT /F1 7 Tf 470.0 421.0 Td () Tj ET
+54 405 8 8 re S
+BT /F1 9 Tf 72.0 406.0 Td (5) Tj ET
+BT /F1 9 Tf 100.0 406.0 Td (1 k 1/4W) Tj ET
+BT /F1 8 Tf 268.0 406.0 Td (axial) Tj ET
+BT /F1 8 Tf 420.0 406.0 Td (R4) Tj ET
+BT /F1 7 Tf 470.0 406.0 Td () Tj ET
+54 390 8 8 re S
+BT /F1 9 Tf 72.0 391.0 Td (5) Tj ET
+BT /F1 9 Tf 100.0 391.0 Td (10 k 1/4W) Tj ET
+BT /F1 8 Tf 268.0 391.0 Td (axial) Tj ET
+BT /F1 8 Tf 420.0 391.0 Td (R5) Tj ET
+BT /F1 7 Tf 470.0 391.0 Td () Tj ET
+BT /F2 9 Tf 54.0 374.0 Td (CONNECTORS & MISC) Tj ET
+54 370 m 558 370 l S
+54 357 8 8 re S
+BT /F1 9 Tf 72.0 358.0 Td (3) Tj ET
+BT /F1 9 Tf 100.0 358.0 Td (CUI SJ1-3523N) Tj ET
+BT /F1 8 Tf 268.0 358.0 Td (3.5 mm TRS jack, THT horizontal) Tj ET
+BT /F1 8 Tf 420.0 358.0 Td (J1) Tj ET
+BT /F1 7 Tf 470.0 358.0 Td (DigiKey/Mouser \(CUI Devices\)) Tj ET
+54 342 8 8 re S
+BT /F1 9 Tf 72.0 343.0 Td (1) Tj ET
+BT /F1 9 Tf 100.0 343.0 Td (3.5 mm stereo cable or powered speakers) Tj ET
+BT /F1 8 Tf 268.0 343.0 Td () Tj ET
+BT /F1 8 Tf 420.0 343.0 Td (test audio) Tj ET
+BT /F1 7 Tf 470.0 343.0 Td () Tj ET
+54 327 8 8 re S
+BT /F1 9 Tf 72.0 328.0 Td (1) Tj ET
+BT /F1 9 Tf 100.0 328.0 Td (Hookup wire 24-26 AWG) Tj ET
+BT /F1 8 Tf 268.0 328.0 Td (small spool) Tj ET
+BT /F1 8 Tf 420.0 328.0 Td (J2 mix-in) Tj ET
+BT /F1 7 Tf 470.0 328.0 Td () Tj ET
+BT /F2 9 Tf 54.0 311.0 Td (OPTIONAL / NICE TO HAVE) Tj ET
+54 307 m 558 307 l S
+54 294 8 8 re S
+BT /F1 9 Tf 72.0 295.0 Td (2) Tj ET
+BT /F1 9 Tf 100.0 295.0 Td (PAM8302 amp module) Tj ET
+BT /F1 8 Tf 268.0 295.0 Td (mono class-D breakout) Tj ET
+BT /F1 8 Tf 420.0 295.0 Td () Tj ET
+BT /F1 7 Tf 470.0 295.0 Td (drives a bare 8-ohm speaker from J1) Tj ET
+54 279 8 8 re S
+BT /F1 9 Tf 72.0 280.0 Td (2) Tj ET
+BT /F1 9 Tf 100.0 280.0 Td (SOP-8 to DIP-8 adapter) Tj ET
+BT /F1 8 Tf 268.0 280.0 Td () Tj ET
+BT /F1 8 Tf 420.0 280.0 Td (U6 alt) Tj ET
+BT /F1 7 Tf 470.0 280.0 Td (only if SOP-in-socket preferred) Tj ET
+54 264 8 8 re S
+BT /F1 9 Tf 72.0 265.0 Td (1) Tj ET
+BT /F1 9 Tf 100.0 265.0 Td (Micro-USB cable) Tj ET
+BT /F1 8 Tf 268.0 265.0 Td (data-capable) Tj ET
+BT /F1 8 Tf 420.0 265.0 Td (Pico flashing) Tj ET
+BT /F1 7 Tf 470.0 265.0 Td (if none on hand) Tj ET
+BT /F1 8 Tf 54.0 242.0 Td (Everything is through-hole except the PT8211-S \(SOP-8, 1.27 mm pitch - easy drag solder\).) Tj ET
+BT /F1 8 Tf 54.0 230.0 Td (TI DIP logic: verify 'N' suffix \(PDIP\) when ordering.  Jack: CUI Devices SJ1-3523N exactly - the footprint matches its datasheet.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000007055 00000 n 
+0000007125 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+7200
+%%EOF
