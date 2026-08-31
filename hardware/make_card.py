@@ -102,11 +102,12 @@ r2("C9 10u", 4.62, 0.75, "ASUM", "AOUT")
 r2("R4 1K", 4.20, 1.60, "PWM", "PWMF")
 r2("C10 100n", 4.36, 1.60, "PWMF", "GND")
 r2("R5 10K", 4.52, 1.60, "PWMF", "ASUM")
-# J1 audio jack (tip/ring/sleeve), J2 mix-in, J3 SWD
-pad("1", "thru_hole", 4.75, 0.30, 0.078, 0.078, ["*.Cu","*.Mask"], drill=1.1, net="AOUT")
-pad("2", "thru_hole", 4.75, 0.45, 0.078, 0.078, ["*.Cu","*.Mask"], drill=1.1, net="AOUT")
-pad("3", "thru_hole", 4.75, 0.60, 0.078, 0.078, ["*.Cu","*.Mask"], drill=1.1, net="GND")
-txt(4.55, 0.18, "J1 AUDIO", 0.8)
+# J1 audio out: plain 1x3 0.1" header (pigtail to a panel jack) — a real
+# TRS jack footprint needs a chosen part + datasheet; v2 material.
+pad("1", "thru_hole", 4.80, 0.30, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
+pad("2", "thru_hole", 4.80, 0.40, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
+pad("3", "thru_hole", 4.80, 0.50, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
+txt(4.48, 0.18, "J1 AUDIO OUT", 0.8)
 pad("1", "thru_hole", 4.95, 1.35, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="AOUT")
 pad("2", "thru_hole", 4.95, 1.45, 0.067, 0.067, ["*.Cu","*.Mask"], drill=1.0, net="GND")
 txt(4.60, 1.28, "J2 SPKR MIX", 0.8)

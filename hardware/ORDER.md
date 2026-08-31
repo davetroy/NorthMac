@@ -27,8 +27,14 @@
 1. ~~1:1 print of the edge fingers vs a real SIO card~~ — done, exact match
 2. Riser goes in the machine before any card gets soldered (geometry +
    pinout live-verify)
-3. **Verify PT8211 pinout against the datasheet** before populating U6
-   (silk-flagged; the DAC is socketed, so worst case is a re-seat)
+3. **Verify PT8211 pinout AND package against the datasheet** before
+   populating U6 (silk-flagged). It commonly ships as SOP-8: if DIP-8
+   is unavailable, use an SOP-8-to-DIP-8 adapter in the socket.
+4. Footprint audit (2026-08-31): everything on the boards is standard
+   0.1" through-hole (DIP sockets, Pico rows at the official 0.700"
+   spacing, headers). J1 is deliberately a 1x3 header — wire a pigtail
+   to a panel-mount 3.5 mm jack; a real jack footprint is v2 material.
+   Radial caps on the 0.3" axial positions just need a bent lead.
 
 ## BOM (per assembled card)
 
@@ -47,7 +53,7 @@
 | C10 | 100 nF | PWM filter |
 | R1, R2, R4 | 1 kΩ | audio sum / PWM |
 | R5 | 10 kΩ | PWM into sum |
-| J1 | 3.5 mm TRS jack, PCB mount | line out |
+| J1 | 1×3 0.1" header + panel-mount 3.5 mm jack on pigtail | line out |
 | J2 | 1×2 0.1" header | speaker mix-in |
 
 Riser BOM: 2 × 1×15 (or one 2×15) 0.1" male header.
